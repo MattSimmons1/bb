@@ -1,7 +1,5 @@
-/**
-Type to represent the definition of a UDT. Built-in types are defined here.
- */
-package main
+// Type to represent the definition of a UDT. Built-in types are defined here.
+package parser
 
 import (
   "strconv"

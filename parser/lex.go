@@ -1,8 +1,8 @@
-// Copyright 2011 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// bb lexer
+// Heavily based on https://github.com/golang/go/tree/master/src/text/template/parse
+// See this talk for a great explanation of how it works: https://www.youtube.com/watch?v=HxaD_trXwRE
 
-package main
+package parser
 
 import (
 	"fmt"
@@ -10,6 +10,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 )
+
+// Pos represents a byte position in the original input text  from which
+// this template was parsed.
+type Pos int
 
 // item represents a token or text string returned from the scanner.
 type item struct {
@@ -164,6 +168,19 @@ type lexer struct {
 	line        int       // 1+number of newlines seen
 	startLine   int       // start line of this item
 }
+
+var verbose = false
+
+func verbose_print(message string) {
+	if verbose {
+		if message == "lexBb" {
+			fmt.Print("\n", message)
+		} else {
+			fmt.Print("/" + message)
+		}
+	}
+}
+
 
 // next returns the next rune in the input.
 func (l *lexer) next() rune {
@@ -900,4 +917,24 @@ func hasLeftTrimMarker(s string) bool {
 
 func hasRightTrimMarker(s string) bool {
 	return len(s) >= 2 && isSpace(rune(s[0])) && s[1] == trimMarker
+}
+
+func Preview(input string) {
+	l := lex(input)
+
+	for item := range l.items {
+
+		colour := ""
+		if item.typ == itemUDT {
+			colour = "94"
+		} else if item.typ == itemString {
+			colour = "92"
+		} else if item.typ == itemNumber {
+			colour = "91"
+		} else if item.typ == itemDefinition {
+			colour = "90"
+		}
+
+		fmt.Print("\033[", colour, "m", item.val, "\033[0m")
+	}
 }
