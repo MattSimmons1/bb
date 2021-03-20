@@ -52,7 +52,6 @@ const (
 	itemEOF
 	itemField      // alphanumeric identifier starting with '.'
 	itemIdentifier // alphanumeric identifier not starting with '.'
-	itemLeftDelim  // left action delimiter
 	itemLeftParen  // '(' inside action
 	itemNumber     // simple number, including imaginary
 	itemPipe       // pipe symbol
@@ -93,7 +92,6 @@ var itemNames = []string{
 "EOF",
 "Field",      // alphanumeric identifier starting with '.'
 "Identifier", // alphanumeric identifier not starting with '.'
-"LeftDelim",  // left action delimiter
 "LeftParen",  // '(' inside action
 "Number",     // simple number, including imaginary
 "Pipe",       // pipe symbol
@@ -137,19 +135,8 @@ var key = map[string]itemType{
 
 const eof = -1
 
-// Trimming spaces.
-// If the action begins "{{- " rather than "{{", then all space/tab/newlines
-// preceding the action are trimmed; conversely if it ends " -}}" the
-// leading spaces are trimmed. This is done entirely in the lexer; the
-// parser never sees it happen. We require an ASCII space (' ', \t, \r, \n)
-// to be present to avoid ambiguity with things like "{{-3}}". It reads
-// better with the space present anyway. For simplicity, only ASCII
-// does the job.
 const (
-	spaceChars    = " \t\r\n"  // These are the space characters defined by Go itself.
-	trimMarker    = '-'        // Attached to left/right delimiter, trims trailing spaces from preceding/following text.
-	trimMarkerLen = Pos(1 + 1) // marker plus space before or after
-	modifiers     = "+-~=<>:;/|#&≠≥≤^"  // all potential modifiers
+	modifiers     = "+~=<>:;/|#&≠≥≤^"  // all potential modifiers
 	quotes        = "`\""
 )
 
@@ -172,7 +159,7 @@ type lexer struct {
 
 var verbose = false
 
-func verbose_print(message string) {
+func log(message string) {
 	if verbose {
 		if message == "lexBb" {
 			fmt.Print("\n", message)
@@ -295,7 +282,7 @@ const (
 
 // lexComment scans a comment. The left comment marker is known to be present.
 func lexComment(l *lexer) stateFn {
-	verbose_print("lexComment")
+	log("lexComment")
 	l.pos += Pos(len(leftComment))
 	i := strings.Index(l.input[l.pos:], rightComment)
 	if i < 0 {
@@ -306,32 +293,9 @@ func lexComment(l *lexer) stateFn {
 	return lexBb
 }
 
-//// lexRightDelim scans the right delimiter, which is known to be present, possibly with a trim marker.
-//func lexRightDelim(l *lexer) stateFn {
-//	trimSpace := hasRightTrimMarker(l.input[l.pos:])
-//	if trimSpace {
-//		l.pos += trimMarkerLen
-//		l.ignore()
-//	}
-//	l.pos += Pos(len(l.rightDelim))
-//	l.emit(itemRightDelim)
-//	if trimSpace {
-//		l.pos += leftTrimLength(l.input[l.pos:])
-//		l.ignore()
-//	}
-//	return lexText
-//}
-
 // lexBb scans bb
 func lexBb(l *lexer) stateFn {
-	verbose_print("lexBb")
-
-	//afterMarker := Pos(0)
-	//if strings.HasPrefix(l.input[l.pos+afterMarker:], leftComment) {
-	//	l.pos += afterMarker
-	//	l.ignore()
-	//	return lexComment
-	//}
+	log("lexBb")
 
 	switch r := l.next(); {
 	case r == eof:
@@ -346,20 +310,8 @@ func lexBb(l *lexer) stateFn {
 		return lexQuote
 	case r == '`':
 		return lexRawQuote
-	case r == '$':
-		return lexVariable
 	case r == '\'':
 		return lexChar
-	//case r == '.':
-		// special look-ahead for ".field" so we don't break l.backup().
-		//if l.pos < Pos(len(l.input)) {
-		//	r := l.input[l.pos]
-		//	if r < '0' || '9' < r {
-		//		return lexField
-		//	}
-		//}
-	//	fallthrough // '.' can start a number.
-	// all user defined typed values and numbers
 	case couldBeUDT(r) ||  r == '+' || r == '-' || ('0' <= r && r <= '9') || r == '.':
     // TODO: if it's an invalid udt it could be a string
 		l.backup()  // do not consume the pizza
@@ -389,7 +341,6 @@ func lexBb(l *lexer) stateFn {
 		l.emit(itemChar)
 	default:
 		return lexIdentifier  // all unicode is allowed, so assume everything else is the start of a definition
-		//return l.errorf("unrecognized character in action: %#U", r)
 	}
 	return lexBb
 }
@@ -397,7 +348,7 @@ func lexBb(l *lexer) stateFn {
 // lexSpace scans a run of space characters.
 // We have not consumed the first space, which is known to be present.
 func lexSpace(l *lexer) stateFn {
-	verbose_print("lexSpace")
+	log("lexSpace")
 	var r rune
 	var numSpaces int
 	for {
@@ -409,7 +360,7 @@ func lexSpace(l *lexer) stateFn {
 		if r == ' ' {
 			numSpaces++
 		} else if r == '\n' {
-			verbose_print("found newline")
+			log("found newline")
 			l.emit(itemNewline)
 			l.acceptRun(" ")  // ignore whitespace at start of next line
 			l.ignore()
@@ -429,7 +380,7 @@ func lexSpace(l *lexer) stateFn {
 
 // lexIdentifier scans an alphanumeric that isn't a udt or a number (could be a definition or bool or string)
 func lexIdentifier(l *lexer) stateFn {
-	verbose_print("lexIdentifier")
+	log("lexIdentifier")
 Loop:
 	for {
 		switch r := l.next(); {
@@ -466,7 +417,7 @@ Loop:
 
 // '∆ =' has already been consumed
 func lexDefinition(l *lexer) stateFn {
-	verbose_print("lexDefinition")
+	log("lexDefinition")
 	l.acceptRun(" ")
 	if !l.accept("{") {
 		l.errorf("Invalid assignment, expected '{")
@@ -502,7 +453,7 @@ func lexField(l *lexer) stateFn {
 // lexVariable scans a Variable: $Alphanumeric.
 // The $ has been scanned.
 func lexVariable(l *lexer) stateFn {
-	verbose_print("lexVariable")
+	log("lexVariable")
 
 	if l.atTerminator() { // Nothing interesting follows -> "$".
 		l.emit(itemVariable)
@@ -514,7 +465,7 @@ func lexVariable(l *lexer) stateFn {
 // lexVariable scans a field or variable: [.$]Alphanumeric.
 // The . or $ has been scanned.
 func lexFieldOrVariable(l *lexer, typ itemType) stateFn {
-	verbose_print("lexFieldOrVariable")
+	log("lexFieldOrVariable")
 
 	if l.atTerminator() { // Nothing interesting follows -> "." or "$".
 		if typ == itemVariable {
@@ -564,7 +515,7 @@ func (l *lexer) atTerminator() bool {
 // lexChar scans a character constant. The initial quote is already
 // scanned. Syntax checking is done by the parser.
 func lexChar(l *lexer) stateFn {
-	verbose_print("lexChar")
+	log("lexChar")
 
 Loop:
 	for {
@@ -588,11 +539,11 @@ Loop:
 // the unit could be multiple different units that start with the same letter
 // We have not consumed any characters
 func lexUDT(l *lexer) stateFn {
-	verbose_print("lexUDT")
+	log("lexUDT")
 
 	if !l.scanUDT() {
 		// not a udt - could be string or number
-		verbose_print("started like a UDT but wasn't. " + string(l.peek()) + " is next")
+		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
 		if isAlphaNumeric(l.peek()) {
 		  return lexNumber
 		} else {
@@ -609,7 +560,7 @@ func lexUDT(l *lexer) stateFn {
 // and "089" - but when it's wrong the input is invalid and the parser (via
 // strconv) will notice.
 func lexNumber(l *lexer) stateFn {
-	verbose_print("lexNumber")
+	log("lexNumber")
 	if !l.scanNumber(false) {
 		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
 	}
@@ -620,7 +571,7 @@ func lexNumber(l *lexer) stateFn {
 func (l *lexer) scanUDT() bool {
 
 	if l.scanUnit() {  // if starts with a unit then only values or modifiers can come next
-		verbose_print("udt with no value")
+		log("udt with no value")
 		if !isSpace(l.peek()) {
 			// next thing could be a modifier, else it's invalid  TODO: right side value
 			return l.scanModifier()
@@ -632,7 +583,7 @@ func (l *lexer) scanUDT() bool {
 
 // check if the next few chars could be a UDT unit
 func (l *lexer) scanUnit() bool {
-  verbose_print("scanUnit")
+  log("scanUnit")
 
   // there could be left arguments already scanned - make sure they're ignored
   start := l.pos
@@ -641,7 +592,7 @@ Loop:  // keep going through until there's a
 	for {
 		switch r := l.next(); {
 		case !(isSpace(r) || unicode.IsDigit(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
-			verbose_print(string(r))
+			log(string(r))
 			// absorb
 		default:
 		  l.backup()
@@ -650,13 +601,20 @@ Loop:  // keep going through until there's a
 				return false
 			}
 
-			verbose_print("unit is " + word)
+			log("unit is " + word)
 
 			for unit := range UDTs {
-				verbose_print("does " + word + " == " + unit + "?")
-
 				if word == unit {
-					verbose_print("it's a known unit")
+					log("it's a known UDT")
+
+					// now we know what the unit is, store so we know which units we have later - speeds up parsing
+					INSTANCES = append(INSTANCES, unit)
+					return true
+				}
+			}
+			for unit := range PDTs {
+				if word == unit {
+					log("it's a known PDT")
 
 					// now we know what the unit is, store so we know which units we have later - speeds up parsing
 					INSTANCES = append(INSTANCES, unit)
@@ -666,7 +624,7 @@ Loop:  // keep going through until there's a
 			break Loop
 		}
 	}
-	verbose_print("it's not a known unit")
+	log("it's not a known unit")
 
 	return false  // unit found did not match known unit - could be a string
 }
@@ -676,9 +634,9 @@ func (l *lexer) scanNumber(udt bool) bool {
 	startPos := l.pos
 
 	if udt {
-	  verbose_print("scanUDT")
+	  log("scanUDT")
 	} else {
-		verbose_print("scanNumber")
+		log("scanNumber")
 	}
 	// Optional leading sign.
 	l.accept("+-")
@@ -719,7 +677,7 @@ func (l *lexer) scanNumber(udt bool) bool {
 			if l.scanModifier() {
 				return true
 			} else if isQuoteChar(l.peek()) || isNumeric(l.peek()) {
-				verbose_print("UDT has a value")
+				log("UDT has a value")
 				if l.scanValue() {
 					return true
 				}
@@ -746,7 +704,7 @@ func (l *lexer) scanNumber(udt bool) bool {
 }
 
 func (l *lexer) scanModifier() bool {
-	verbose_print("scanModifier")
+	log("scanModifier")
 
 Loop:  // loop for multiple modifier/value pairs
 	for {
@@ -758,7 +716,7 @@ Loop:  // loop for multiple modifier/value pairs
 			// it's a value
 			l.scanValue()
 		} else {  // invalid
-		  verbose_print(string(l.peek()) + " is not a modifier")
+		  log(string(l.peek()) + " is not a modifier")
 			return false
 		}
 
@@ -768,7 +726,7 @@ Loop:  // loop for multiple modifier/value pairs
 
 // values of modifiers can be numbers, quoted strings, or structures (TODO)
 func (l *lexer) scanValue() bool {
-	verbose_print("scanValue")
+	log("scanValue")
 
 	quoted := false
 	quoteChar := l.peek()
@@ -785,9 +743,9 @@ Loop:
 		case quoted && r == '\\':
 			if l.next() == quoteChar {
 				// absorb escaped quote
-				verbose_print("found escaped quote")
+				log("found escaped quote")
 			} else {
-				verbose_print("found stray backslash")
+				log("found stray backslash")
 				l.backup()  // backslash is absorbed
 			}
 		case quoted && r != quoteChar:
@@ -814,7 +772,7 @@ Loop:
 
 // lexQuote scans a quoted string.
 func lexQuote(l *lexer) stateFn {
-	verbose_print("lexQuote")
+	log("lexQuote")
 
 Loop:
 	for {
@@ -836,7 +794,7 @@ Loop:
 
 // lexRawQuote scans a raw quoted string.
 func lexRawQuote(l *lexer) stateFn {
-	verbose_print("lexRawQuote")
+	log("lexRawQuote")
 
 Loop:
 	for {
@@ -877,14 +835,6 @@ func isNumeric(r rune) bool {
 // isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.
 func isAlphaNumeric(r rune) bool {
 	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
-}
-
-func hasLeftTrimMarker(s string) bool {
-	return len(s) >= 2 && s[0] == trimMarker && isSpace(rune(s[1]))
-}
-
-func hasRightTrimMarker(s string) bool {
-	return len(s) >= 2 && isSpace(rune(s[0])) && s[1] == trimMarker
 }
 
 func Preview(input string) {

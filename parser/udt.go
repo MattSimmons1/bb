@@ -12,11 +12,10 @@ type udt struct {
   NumericalProps map[string]float64
   StringProps map[string]string
   //JSProps map[string]string  TODO: v0.1.1
-  //Specialprops left, right  TODO: v0.1.2 - modifies the left and right arguments
   Modifiers map[rune]Modifier
 }
 
-type Modifier struct {  // TODO
+type Modifier struct {
   name string
 }
 
@@ -27,7 +26,7 @@ func NewUDT(unit string, numericalProps map[string]float64, stringProps map[stri
 
 // take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
 func NewUDTFromDefinition(definition string) {
-  verbose_print("Define new UDT with " + definition)
+  log("Define new UDT with " + definition)
 
   // extract just the unit
   i := strings.Index(definition, " ")
@@ -67,19 +66,19 @@ func NewUDTFromDefinition(definition string) {
 
     if len(p[0]) == 1 && isModifierChar(rune(p[0][0])) {
       // TODO: remove quotes around value
-      verbose_print("modifier prop: " + p[0] + " = " + p[1])
+      log("modifier prop: " + p[0] + " = " + p[1])
       modifiers[rune(p[0][0])] = Modifier{ p[1] }
     } else if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
-      verbose_print("numerical prop: " + p[0])
+      log("numerical prop: " + p[0])
       numericalProps[p[0]] = number
     } else {
-      verbose_print("string prop: " + p[0])
+      log("string prop: " + p[0])
       // TODO: remove quotes
       stringProps[p[0]] = p[1]
     }
   }
 
-  verbose_print("unit is " + unit)
+  log("unit is " + unit)
 
   t := NewUDT(unit, numericalProps, stringProps, modifiers)
 
@@ -92,7 +91,7 @@ func (t *udt) AddModifier(r rune, name string) {
 
 // parse a UDT string - we already know it's valid
 func (t *udt) Parse(s string) map[string]interface{} {
-  verbose_print("parse " + s + " with unit " + t.Unit)
+  log("parse " + s + " with unit " + t.Unit)
 
   pos := strings.Index(s, t.Unit)
 
@@ -111,13 +110,13 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
   if pos != length { // if there is anything remaining
 
-    verbose_print("this is left: " + s[pos:])
+    log("this is left: " + s[pos:])
 
     if r := rune(s[pos:pos+1][0]); isQuoteChar(r) {
-      verbose_print("UDT has value")
+      log("UDT has value")
       // we already know that value is valid from lexing
       if isQuoteChar(r) {
-        verbose_print("this is left: " + s[pos:])
+        log("this is left: " + s[pos:])
 
         valueIdx := pos + 1
         pos = valueIdx
@@ -127,7 +126,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
           } else if rune(s[pos]) == '\\' && rune(s[pos+1]) == r  {
               pos+=2  // escaped quotes
           } else {
-            verbose_print("this is left: " + s[pos:])
+            log("this is left: " + s[pos:])
             pos++
           }
         }
@@ -135,7 +134,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
         pos++
       }
 
-      verbose_print("value is " + data["value"].(string))
+      log("value is " + data["value"].(string))
 
     } else if isNumeric(r) {
       valueIdx := pos
@@ -144,7 +143,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
         if pos == length || !isNumeric(rune(s[pos])) {
           break
         } else {
-          verbose_print("this is left: " + s[pos:])
+          log("this is left: " + s[pos:])
           pos++
         }
       }
@@ -157,14 +156,14 @@ func (t *udt) Parse(s string) map[string]interface{} {
   }
 
   if pos != length {  // if there is anything remaining
-    verbose_print("this is left: " + s[pos:])
+    log("this is left: " + s[pos:])
 
     allModifiers := ""
     for r := range t.Modifiers {
       allModifiers += string(r)
     }
 
-    verbose_print("looking for modifiers out of: " + allModifiers)
+    log("looking for modifiers out of: " + allModifiers)
 
     for {
       if pos == len(s) {
@@ -172,24 +171,24 @@ func (t *udt) Parse(s string) map[string]interface{} {
       }
       // next char must be a modifier
       m := t.Modifiers[rune(s[pos:pos+1][0])]
-      verbose_print("found modifier: " + m.name)
+      log("found modifier: " + m.name)
       pos++
       // find the next modifier
       nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
       if nextModifierIdx < 0 {
-        verbose_print("no more modifiers")
+        log("no more modifiers")
         nextModifierIdx = len(s)  // no more modifiers
       } else {
         nextModifierIdx += pos
       }
-      verbose_print(s[pos:])
-      verbose_print(s[pos:nextModifierIdx])
+      log(s[pos:])
+      log(s[pos:nextModifierIdx])
       mValue := s[pos:nextModifierIdx]
       if mValue == "" {
-        verbose_print("with no value --> 1")
+        log("with no value --> 1")
         mValue = "1"
       } else {
-        verbose_print("with value: " + mValue)
+        log("with value: " + mValue)
       }
 
       if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
@@ -215,19 +214,8 @@ func (t *udt) Parse(s string) map[string]interface{} {
   return data
 }
 
-
-// keeps track of every UDT we have defined
-var UDTs = map[string]*udt{
-  //"∆": {"∆", map[rune]Modifier{  // e.g.
-  //  '+': {"with_breaks"},
-  //  '*': {"until_failure"},
-  //}},
-  //// built-in types
-  //"g": {"g", make(map[rune]Modifier)},
-  //"kg": {"kg", make(map[rune]Modifier)},
-
-}
-
+var UDTs = map[string]*udt{}  // stores user defined types
+var PDTs = map[string]*udt{}  // stores pre-defined types
 
 var INSTANCES []string  // stores the unit of every UDT we find
 var instanceIdx int = 0  // the current index of INSTANCES we're parsing
@@ -237,34 +225,105 @@ func ParseUDT(input string) map[string]interface{} {
   unit := INSTANCES[instanceIdx]
   instanceIdx++
   t := UDTs[unit]
+  if t == nil {
+    t = PDTs[unit]
+  }
   return t.Parse(input)
 }
 
 func defineBuiltInTypes() {
-  // TODO - find a faster way to define them?
-  UDTs["g"] = NewUDT("g", map[string]float64{}, map[string]string{ "unit": "gram" }, map[rune]Modifier{})
+  SITypes := []string{
+    "g,gram,weight",
+    "kg,kilogram,weight",
+    "s,second,time",
+    "min,minute,time",
+    "h,hour,time",
+    "d,day,time",
+    "m,metre,length",
+    "km,kilometre,length",
+    "au,astronomical unit,length",
+    "l,litre,volume",
+    "K,kelvin,temperature",
+    "A,ampere,electric current",
+    "mol,mole,amount of substance",
+    "cd,candela,luminous intensity",
+    "rad,radian,plane angle",
+    "sr,steradian,solid angle",
+    "Hz,hertz,frequency",
+    "N,newton,force",
+    "Pa,pascal,pressure",
+    "J,joule,energy",
+    "eV,electron volt,energy",
+    "W,watt,power",
+    "C,coulomb,electric charge",
+    "V,volt,voltage",
+    "F,farad,capacitance",
+    "Ω,ohm,resistance",
+    "S,siemens,electrical conductance",
+    "Wb,weber,magnetic flux",
+    "T,tesla,magnetic flux density",
+    "H,henry,inductance",
+    "°C,Celsius,temperature",
+    "lm,lumen,luminous flux",
+    "lx,lux,illuminance",
+    "Bq,becquerel,radioactivity",
+    "Gy,gray,absorbed dose",
+    "Sv,sievert,equivalent dose",
+    "kat,katal,catalytic activity",
+  }
+
+  for _, t := range SITypes {
+    def := strings.SplitN(t, ",", 3)
+    PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] }, map[rune]Modifier{})
+  }
+
+  //Quantity	Name	Symbol	Value in SI units
+  //plane and
+  //phase angle	degree	°	1° = (π/180) rad
+  //minute	′	1′ = (1/60)° = (π/10800) rad
+  //second	″	1″ = (1/60)′ = (π/648000) rad
+  //area	hectare	ha	1 ha = 1 hm2 = 104 m2
+  //mass	tonne (metric ton)	t	1 t = 1 000 kg
+  //dalton	Da	1 Da = 1.660539040(20)×10−27 kg
+  //bel	B
+  //decibel	dB
+
+  // currency
+  currencyTypes := []string{
+    "$,United States dollar",
+    "£,Great British pound sterling",
+    "¥,Japanese yen",
+    "円,Japanese yen",
+    "元,Chinese renminbi yuan",
+  }
+  for _, t := range currencyTypes {
+    def := strings.SplitN(t, ",", 2)
+    PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": "money" }, map[rune]Modifier{})
+  }
 }
 
-// return true if a rune could be the start of a udt - slightly faster than checking the whole thing?
+// return true if a rune could be the start of a udt - slightly faster than checking the whole thing
 func couldBeUDT(r rune) bool {
   if unicode.IsDigit(r) {
     return true
   }
 
   i := 0
-  for k := range UDTs {
-    verbose_print(string([]rune(k)[0]))
+  for k := range UDTs {  // check UDTs first
+    log(string([]rune(k)[0]))
     if r == []rune(k)[0] {  // does the first rune in the UDT's unit match
-      verbose_print("could " + string(r) + " be a udt? yes!")
+      log("could " + string(r) + " be a udt? yes!")
       return true
     }
     i++
   }
-  verbose_print("could " + string(r) + " be a udt? no.")
+  for k := range PDTs {  // now check PDTs TODO: pre-make this array?
+    log(string([]rune(k)[0]))
+    if r == []rune(k)[0] {  // does the first rune in the UDT's unit match
+      log("could " + string(r) + " be a udt? actually it's a pdt!")
+      return true
+    }
+  }
+  log("could " + string(r) + " be a udt? no.")
   return false
-  //_, ok := UDTs[string(r)]
-  //if !ok {
-  //
-  //}
-  //return ok
 }
