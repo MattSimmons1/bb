@@ -60,7 +60,7 @@ if err := func() (rootCmd *cobra.Command) {
     },
   }
   rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
-    "View the interpretation of the input without converting")
+    "view the interpretation of the input without converting")
 
   rootCmd.AddCommand(func() (createCmd *cobra.Command) {
     createCmd = &cobra.Command{

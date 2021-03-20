@@ -293,80 +293,6 @@ const (
 	rightComment = "*/"
 )
 
-// lexText scans until an opening action delimiter, "{{".
-func lexText(l *lexer) stateFn {
-	verbose_print("lexText")
-
-	l.width = 0
-	//if x := strings.Index(l.input[l.pos:], l.leftDelim); x >= 0 {
-	//	ldn := Pos(len(l.leftDelim))
-	//	l.pos += Pos(x)
-	//	trimLength := Pos(0)
-	//	if hasLeftTrimMarker(l.input[l.pos+ldn:]) {
-	//		trimLength = rightTrimLength(l.input[l.start:l.pos])
-	//	}
-	//	l.pos -= trimLength
-	//	if l.pos > l.start {
-	//		l.line += strings.Count(l.input[l.start:l.pos], "\n")
-	//		l.emit(itemText)
-	//	}
-	//	l.pos += trimLength
-	//	l.ignore()
-	//	return lexLeftDelim
-	//}
-	l.pos = Pos(len(l.input))
-	verbose_print("EOF")
-	// Correctly reached EOF.
-	if l.pos > l.start {
-		l.line += strings.Count(l.input[l.start:l.pos], "\n")
-		l.emit(itemText)
-	}
-	l.emit(itemEOF)
-	return nil
-}
-
-// rightTrimLength returns the length of the spaces at the end of the string.
-func rightTrimLength(s string) Pos {
-	return Pos(len(s) - len(strings.TrimRight(s, spaceChars)))
-}
-
-//// atRightDelim reports whether the lexer is at a right delimiter, possibly preceded by a trim marker.
-//func (l *lexer) atRightDelim() (delim, trimSpaces bool) {
-//	if hasRightTrimMarker(l.input[l.pos:]) && strings.HasPrefix(l.input[l.pos+trimMarkerLen:], l.rightDelim) { // With trim marker.
-//		return true, true
-//	}
-//	if strings.HasPrefix(l.input[l.pos:], l.rightDelim) { // Without trim marker.
-//		return true, false
-//	}
-//	return false, false
-//}
-
-// leftTrimLength returns the length of the spaces at the beginning of the string.
-func leftTrimLength(s string) Pos {
-	return Pos(len(s) - len(strings.TrimLeft(s, spaceChars)))
-}
-
-//// lexLeftDelim scans the left delimiter, which is known to be present, possibly with a trim marker.
-//func lexLeftDelim(l *lexer) stateFn {
-//	verbose_print("lexLeftDelim")
-//	l.pos += Pos(len(l.leftDelim))
-//	trimSpace := hasLeftTrimMarker(l.input[l.pos:])
-//	afterMarker := Pos(0)
-//	if trimSpace {
-//		afterMarker = trimMarkerLen
-//	}
-//	if strings.HasPrefix(l.input[l.pos+afterMarker:], leftComment) {
-//		l.pos += afterMarker
-//		l.ignore()
-//		return lexComment
-//	}
-//	l.emit(itemLeftDelim)
-//	l.pos += afterMarker
-//	l.ignore()
-//	l.parenDepth = 0
-//	return lexBb
-//}
-
 // lexComment scans a comment. The left comment marker is known to be present.
 func lexComment(l *lexer) stateFn {
 	verbose_print("lexComment")
@@ -376,17 +302,6 @@ func lexComment(l *lexer) stateFn {
 		return l.errorf("unclosed comment")
 	}
 	l.pos += Pos(i + len(rightComment))
-	//delim, trimSpace := l.atRightDelim()
-	//if !delim {
-	//	return l.errorf("comment ends before closing delimiter")
-	//}
-	//if trimSpace {
-	//	l.pos += trimMarkerLen
-	//}
-	//l.pos += Pos(len(l.rightDelim))
-	//if trimSpace {
-	//	l.pos += leftTrimLength(l.input[l.pos:])
-	//}
 	l.ignore()
 	return lexBb
 }

@@ -107,20 +107,20 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
   pos += len(t.Unit)
 
-  if pos != len(s) { // if there is anything remaining
+  length := len(s)
+
+  if pos != length { // if there is anything remaining
 
     verbose_print("this is left: " + s[pos:])
 
-    if r := rune(s[pos:pos+1][0]); isQuoteChar(r) || isNumeric(r) {
+    if r := rune(s[pos:pos+1][0]); isQuoteChar(r) {
       verbose_print("UDT has value")
-      value := ""
       // we already know that value is valid from lexing
       if isQuoteChar(r) {
         verbose_print("this is left: " + s[pos:])
 
         valueIdx := pos + 1
         pos = valueIdx
-        // TODO: escaped backticks or quotes
         for {
           if rune(s[pos]) == r {
             break
@@ -131,18 +131,32 @@ func (t *udt) Parse(s string) map[string]interface{} {
             pos++
           }
         }
-        value = s[valueIdx:pos]
+        data["value"] = s[valueIdx:pos]
         pos++
       }
-      // TODO: quoted
-      // TODO: numerical value
 
-      verbose_print("value is " + value)
-      data["value"] = value
+      verbose_print("value is " + data["value"].(string))
+
+    } else if isNumeric(r) {
+      valueIdx := pos
+      pos = valueIdx
+      for {
+        if pos == length || !isNumeric(rune(s[pos])) {
+          break
+        } else {
+          verbose_print("this is left: " + s[pos:])
+          pos++
+        }
+      }
+      number, err := strconv.ParseFloat(s[valueIdx:pos], 64)
+      if err != nil {
+        panic(err)
+      }
+      data["value"] = number
     }
   }
 
-  if pos != len(s) {  // if there is anything remaining
+  if pos != length {  // if there is anything remaining
     verbose_print("this is left: " + s[pos:])
 
     allModifiers := ""
