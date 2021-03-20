@@ -111,20 +111,21 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
     verbose_print("this is left: " + s[pos:])
 
-    // TODO: parse right value
     if r := rune(s[pos:pos+1][0]); isQuoteChar(r) || isNumeric(r) {
       verbose_print("UDT has value")
       value := ""
       // we already know that value is valid from lexing
-      if r == '`' {
+      if isQuoteChar(r) {
         verbose_print("this is left: " + s[pos:])
 
         valueIdx := pos + 1
         pos = valueIdx
-        // TODO: escaped backticks
+        // TODO: escaped backticks or quotes
         for {
-          if rune(s[pos]) == '`' {
+          if rune(s[pos]) == r {
             break
+          } else if rune(s[pos]) == '\\' && rune(s[pos+1]) == r  {
+              pos+=2  // escaped quotes
           } else {
             verbose_print("this is left: " + s[pos:])
             pos++

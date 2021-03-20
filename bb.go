@@ -82,7 +82,9 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
-- [ ] lex value for UDTs with no quantity
+- [ ] lex value for UDTs with no quantity (before lexNumber)
+- [ ] parse numerical value
+- [ ] UDT followed by UDT - two UDTs
 - [ ] strings
   - [ ] convert invalid udt to string?
 v0.2.0

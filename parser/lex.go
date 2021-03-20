@@ -856,14 +856,9 @@ func (l *lexer) scanValue() bool {
 	verbose_print("scanValue")
 
 	quoted := false
-	if l.peek() == '"' {
+	quoteChar := l.peek()
+	if quoteChar == '"' || quoteChar == '`' {
 		quoted = true
-		l.next()
-	}
-
-	backTickQuoted := false
-	if l.peek() == '`' {
-		backTickQuoted = true
 		l.next()
 	}
 
@@ -872,19 +867,24 @@ Loop:
 		switch r := l.next(); {
 		case isNumeric(r):
 			// absorb
-		case quoted && r != '"':
+		case quoted && r == '\\':
+			if l.next() == quoteChar {
+				// absorb escaped quote
+				verbose_print("found escaped quote")
+			} else {
+				verbose_print("found stray backslash")
+				l.backup()  // backslash is absorbed
+			}
+		case quoted && r != quoteChar:
 			// absorb
-		case backTickQuoted && r != '`':
-			// absorb
+		case r == eof || r == '\n':
+			if quoted {
+				l.errorf("unterminated quoted string")
+				return false
+			}
 		default:
 			if quoted {
-        if r != '"' {
-				  return false
-				}
-        break Loop
-			}
-			if backTickQuoted {
-        if r != '`' {
+        if r != quoteChar {
 				  return false
 				}
         break Loop
