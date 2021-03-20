@@ -7,6 +7,15 @@ import (
 	"strconv"
 )
 
+func removeQuotes(s string) string {
+	if s[:1] == `"` {
+		if s[len(s)-1:] == `"` {
+			return s[1:len(s)-1]
+		}
+	}
+	return s
+}
+
 func Parse(input string) []interface{} {
 
 	l := lex(input)
@@ -19,13 +28,13 @@ func Parse(input string) []interface{} {
 			if err != nil {
 				panic(err)
 			}
-			row = append(row, map[string]float64{ "value": number })
+			row = append(row, number)
 		} else if item.typ == itemTab {
 			// todo
 		} else if item.typ == itemNewline {
 			// todo
-		} else if item.typ == itemEOF {
-			// no value
+		} else if item.typ == itemString {
+			row = append(row, removeQuotes(item.val))
 		} else if item.typ == itemUDT {
 			row = append(row, ParseUDT(item.val))
 		} else {
@@ -39,9 +48,10 @@ func Parse(input string) []interface{} {
 func UnitTest() {
 	verbose = true
 
-	testInput := "∆ = { unit: pizza, length: 2, +: extra large, =:slices, #: on my tab, >: comment }\n"
-
-	l := lex(testInput + "§µ🚀 = { unit: baseball caps }\n346 §µ🚀 ∆+ 34∆ 3.4∆=12+23#>hello \"hello\"\n/*comment*/")
+	testInput := "∆ = { unit: pizza, length: 2, +: extra large, =:slices, #: on my tab, >: comment }\n" +
+		           "§µ🚀 = { unit: baseball caps }\n" +
+		           "gg 9g`# wow` ∆ 346 hello §µ🚀 ∆+ 34∆-2.0 3.4∆=12+23#>`hello` \"hello\"\n/*comment*/"
+	l := lex(testInput)
 
 	for item := range l.items {
 		value := ""

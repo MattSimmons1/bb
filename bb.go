@@ -82,7 +82,7 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
-- [x] Refactor for multiple types
+- [ ] lex value for UDTs with no quantity
 - [ ] strings
   - [ ] convert invalid udt to string?
 v0.2.0

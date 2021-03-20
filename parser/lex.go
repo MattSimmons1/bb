@@ -150,6 +150,7 @@ const (
 	trimMarker    = '-'        // Attached to left/right delimiter, trims trailing spaces from preceding/following text.
 	trimMarkerLen = Pos(1 + 1) // marker plus space before or after
 	modifiers     = "+-~=<>:;/|#&≠≥≤^"  // all potential modifiers
+	quotes        = "`\""
 )
 
 // stateFn represents the state of the scanner as a function that returns the next state.
@@ -511,7 +512,7 @@ func lexSpace(l *lexer) stateFn {
 	return lexBb
 }
 
-// lexIdentifier scans an alphanumeric that isn't a udt or a number (could be a definition or bool)
+// lexIdentifier scans an alphanumeric that isn't a udt or a number (could be a definition or bool or string)
 func lexIdentifier(l *lexer) stateFn {
 	verbose_print("lexIdentifier")
 Loop:
@@ -538,7 +539,8 @@ Loop:
 				if l.accept("=") {  // todo: make '=' optional
 					return lexDefinition
 				}
-				l.emit(itemIdentifier)
+				l.emit(itemString)
+				//l.emit(itemIdentifier)
 			}
 			break Loop
 		}
@@ -674,7 +676,13 @@ func lexUDT(l *lexer) stateFn {
 	verbose_print("lexUDT")
 
 	if !l.scanUDT() {
-		return lexNumber  // if it can't be a UDT then it's probably a number
+		// not a udt - could be string or number
+		verbose_print("started like a UDT but wasn't. " + string(l.peek()) + " is next")
+		if isAlphaNumeric(l.peek()) {
+		  return lexNumber
+		} else {
+			return lexIdentifier
+		}
 	}
 	l.emit(itemUDT)
 
@@ -696,7 +704,7 @@ func lexNumber(l *lexer) stateFn {
 
 func (l *lexer) scanUDT() bool {
 
-	if l.scanUnit() {  // if starts with a unit then only modifiers can come next
+	if l.scanUnit() {  // if starts with a unit then only values or modifiers can come next
 		verbose_print("udt with no value")
 		if !isSpace(l.peek()) {
 			// next thing could be a modifier, else it's invalid  TODO: right side value
@@ -717,7 +725,7 @@ func (l *lexer) scanUnit() bool {
 Loop:  // keep going through until there's a
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || unicode.IsDigit(r) || isModifierChar(r)):  // if non unit character // TODO modifier chars
+		case !(isSpace(r) || unicode.IsDigit(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
 			verbose_print(string(r))
 			// absorb
 		default:
@@ -750,6 +758,8 @@ Loop:  // keep going through until there's a
 
 // determine if we have a valid number or udt
 func (l *lexer) scanNumber(udt bool) bool {
+	startPos := l.pos
+
 	if udt {
 	  verbose_print("scanUDT")
 	} else {
@@ -785,12 +795,26 @@ func (l *lexer) scanNumber(udt bool) bool {
 	if udt {
 
 		if !l.scanUnit() {
-			return false  // if there's no UDT unit now then it's not a UDT
+			l.pos = startPos  // reset
+			return false  // if there's no UDT unit now then it's not a UDT (it's a number)
 		}
 
 		if !isSpace(l.peek()) {
-			// next thing could be a modifier, else it's invalid
-			return l.scanModifier()
+			// next thing could be a modifier, else it's invalid // TODO: or value
+			if l.scanModifier() {
+				return true
+			} else if isQuoteChar(l.peek()) || isNumeric(l.peek()) {
+				verbose_print("UDT has a value")
+				if l.scanValue() {
+					return true
+				}
+				// value was invalid (e.g. ∆`unclosed string) - must be a string
+				l.pos = startPos  // reset
+				return false
+			} else {
+				l.pos = startPos  // reset
+				return false
+			}
 		}
 
 		return true
@@ -799,6 +823,7 @@ func (l *lexer) scanNumber(udt bool) bool {
 		// Next thing mustn't be alphanumeric.
 		if isAlphaNumeric(l.peek()) {
 			l.next()
+			l.pos = startPos  // reset
 			return false
 		}
 		return true
@@ -818,33 +843,52 @@ Loop:  // loop for multiple modifier/value pairs
 			// it's a value
 			l.scanValue()
 		} else {  // invalid
-			l.errorf("Expected a modifier, found '" + string(l.peek()) + "', invalid!")
+		  verbose_print(string(l.peek()) + " is not a modifier")
 			return false
 		}
-
-		//// if a value comes next then it's valid, else it's value is 1
-		//if isAlphaNumeric(l.peek()) {
-		//
-		//  return true
-		//}
-		//return true  // value is
 
 	}
 	return true
 }
 
-// values of modifiers can be numbers, strings, quoted strings, UDTs?
+// values of modifiers can be numbers, quoted strings, or structures (TODO)
 func (l *lexer) scanValue() bool {
 	verbose_print("scanValue")
+
+	quoted := false
+	if l.peek() == '"' {
+		quoted = true
+		l.next()
+	}
+
+	backTickQuoted := false
+	if l.peek() == '`' {
+		backTickQuoted = true
+		l.next()
+	}
 
 Loop:
 	for {
 		switch r := l.next(); {
-		case isAlphaNumeric(r):  // TODO: quoted strings
-			// absorb.
-		//case l.scanUDT("∆"): TODO
-			// absorb.
+		case isNumeric(r):
+			// absorb
+		case quoted && r != '"':
+			// absorb
+		case backTickQuoted && r != '`':
+			// absorb
 		default:
+			if quoted {
+        if r != '"' {
+				  return false
+				}
+        break Loop
+			}
+			if backTickQuoted {
+        if r != '`' {
+				  return false
+				}
+        break Loop
+			}
 			l.backup()
 			break Loop
 		}
@@ -896,6 +940,10 @@ func isModifierChar(r rune) bool {
 	return strings.ContainsRune(modifiers, r)
 }
 
+func isQuoteChar(r rune) bool {
+	return strings.ContainsRune(quotes, r)
+}
+
 // isSpace reports whether r is a space character.
 func isSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
@@ -904,6 +952,11 @@ func isSpace(r rune) bool {
 // is character valid in a unit? i.e. not a space, modifier char, or number
 func isUnitChar(r rune) bool {
 	return !isSpace(r) && !unicode.IsDigit(r) && !isModifierChar(r)
+}
+
+func isNumeric(r rune) bool {
+	return unicode.IsNumber(r) || r == '.' || r == '-'
+
 }
 
 // isAlphaNumeric reports whether r is an alphabetic, digit, or underscore.

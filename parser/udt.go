@@ -92,66 +92,102 @@ func (t *udt) AddModifier(r rune, name string) {
 
 // parse a UDT string - we already know it's valid
 func (t *udt) Parse(s string) map[string]interface{} {
-  verbose_print("parse " + t.Unit)
+  verbose_print("parse " + s + " with unit " + t.Unit)
 
   pos := strings.Index(s, t.Unit)
 
   data := make(map[string]interface{})
 
-  value := s[0:pos]
-  if value == "" {
-    value = "1"
+  quantity := s[0:pos]
+  if quantity == "" {
+    quantity = "1"
   }
-  number, _ := strconv.ParseFloat(value, 64)
-  data["value"] = number
+  number, _ := strconv.ParseFloat(quantity, 64)
+  data["quantity"] = number
 
   pos += len(t.Unit)
 
-  verbose_print("this is left: " + s[pos:])
+  if pos != len(s) { // if there is anything remaining
 
-  // TODO: parse right value
+    verbose_print("this is left: " + s[pos:])
 
-  allModifiers := ""
-  for r := range t.Modifiers {
-    allModifiers += string(r)
+    // TODO: parse right value
+    if r := rune(s[pos:pos+1][0]); isQuoteChar(r) || isNumeric(r) {
+      verbose_print("UDT has value")
+      value := ""
+      // we already know that value is valid from lexing
+      if r == '`' {
+        verbose_print("this is left: " + s[pos:])
+
+        valueIdx := pos + 1
+        pos = valueIdx
+        // TODO: escaped backticks
+        for {
+          if rune(s[pos]) == '`' {
+            break
+          } else {
+            verbose_print("this is left: " + s[pos:])
+            pos++
+          }
+        }
+        value = s[valueIdx:pos]
+        pos++
+      }
+      // TODO: quoted
+      // TODO: numerical value
+
+      verbose_print("value is " + value)
+      data["value"] = value
+    }
   }
 
-  verbose_print("looking for modifiers out of: " + allModifiers)
+  if pos != len(s) {  // if there is anything remaining
+    verbose_print("this is left: " + s[pos:])
 
-  for {
-    if pos == len(s) {
-      break
-    }
-    // next char must be a modifier
-    m := t.Modifiers[rune(s[pos:pos+1][0])]
-    verbose_print("found modifier: " + m.name)
-    pos++
-    // find the next modifier
-    nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
-    if nextModifierIdx < 0 {
-      verbose_print("no more modifiers")
-      nextModifierIdx = len(s)  // no more modifiers
-    } else {
-      nextModifierIdx += pos
-    }
-    verbose_print(s[pos:])
-    verbose_print(s[pos:nextModifierIdx])
-    mValue := s[pos:nextModifierIdx]
-    if mValue == "" {
-      verbose_print("with no value --> 1")
-      mValue = "1"
-    } else {
-      verbose_print("with value: " + mValue)
+    allModifiers := ""
+    for r := range t.Modifiers {
+      allModifiers += string(r)
     }
 
-    if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
-      data[m.name] = number
-    } else {
-      data[m.name] = mValue
+    verbose_print("looking for modifiers out of: " + allModifiers)
+
+    for {
+      if pos == len(s) {
+        break
+      }
+      // next char must be a modifier
+      m := t.Modifiers[rune(s[pos:pos+1][0])]
+      verbose_print("found modifier: " + m.name)
+      pos++
+      // find the next modifier
+      nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
+      if nextModifierIdx < 0 {
+        verbose_print("no more modifiers")
+        nextModifierIdx = len(s)  // no more modifiers
+      } else {
+        nextModifierIdx += pos
+      }
+      verbose_print(s[pos:])
+      verbose_print(s[pos:nextModifierIdx])
+      mValue := s[pos:nextModifierIdx]
+      if mValue == "" {
+        verbose_print("with no value --> 1")
+        mValue = "1"
+      } else {
+        verbose_print("with value: " + mValue)
+      }
+
+      if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
+        data[m.name] = number
+      } else {
+        data[m.name] = mValue
+      }
+
+      pos = nextModifierIdx
     }
 
-    pos = nextModifierIdx
   }
+
 
   for k, v := range t.NumericalProps {
     data[k] = v
