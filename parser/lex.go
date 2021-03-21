@@ -157,7 +157,7 @@ type lexer struct {
 	startLine   int       // start line of this item
 }
 
-var verbose = false
+var verbose = true
 
 func log(message string) {
 	if verbose {
@@ -393,13 +393,11 @@ Loop:
 				return l.errorf("bad character %#U", r)
 			}
 			switch {
-			case key[word] > itemKeyword:
-				l.emit(key[word])
-			case word[0] == '.':
-				l.emit(itemField)
 			case word == "true", word == "false":
 				l.emit(itemBool)
 			default:
+				log("word is " + word)
+
 				// look-ahead for assignment
 				l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
 				if l.accept("=") {  // todo: make '=' optional

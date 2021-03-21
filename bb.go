@@ -23,7 +23,6 @@ func UnitTest() {
 }
 
 func Convert(input string) {
-  //verbose= true
   input = strings.Replace(input, "\\n", "\n", -1)  // convert raw escaped chars to literals
   input = strings.Replace(input, "\\t", "\t", -1)
 
@@ -83,6 +82,7 @@ if err := func() (rootCmd *cobra.Command) {
 To Do
 MVP
 - [ ] lex value for UDTs with no quantity (before lexNumber)
+- [ ] anything can be a modifier
 - [ ] UDT followed by UDT - two UDTs
 - [ ] strings
   - [ ] convert invalid udt to string?

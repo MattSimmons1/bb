@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 func removeQuotes(s string) string {
@@ -34,7 +35,13 @@ func Parse(input string) []interface{} {
 		} else if item.typ == itemNewline {
 			// todo
 		} else if item.typ == itemString {
-			row = append(row, removeQuotes(item.val))
+			row = append(row, strings.TrimSpace(removeQuotes(item.val)))
+		} else if item.typ == itemBool {
+			if item.val == "true" {
+			  row = append(row, true)
+			} else {
+			  row = append(row, false)
+			}
 		} else if item.typ == itemUDT {
 			row = append(row, ParseUDT(item.val))
 		} else {
@@ -50,7 +57,7 @@ func UnitTest() {
 
 	testInput := "∆ = { unit: pizza, length: 2, +: extra large, =:slices, #: on my tab, >: comment }\n" +
 		           "§µ🚀 = { unit: baseball caps }\n" +
-		           "𓂀 = { type: eye }\n" +
+		           "𓂀 = { type: eye of horus }\n" +
 		           "gg 9g\"# w\\\"ow\" ∆ 346 1元100 100°C hello §µ🚀 ∆+ 34∆-2.0 3.4∆=12+23#>`hello` \"hello\"\n/*comment*/"
 	l := lex(testInput)
 
