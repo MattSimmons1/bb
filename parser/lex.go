@@ -157,7 +157,7 @@ type lexer struct {
 	startLine   int       // start line of this item
 }
 
-var verbose = true
+var verbose = false
 
 func log(message string) {
 	if verbose {

@@ -7,6 +7,7 @@ import (
   "encoding/json"
   "fmt"
   "github.com/spf13/cobra"
+  "io/ioutil"
   "log"
   "strings"
 )
@@ -50,11 +51,22 @@ if err := func() (rootCmd *cobra.Command) {
         fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
         return
       }
+
+      input := ""
+
+      // try to open argument as a file
+      data, err := ioutil.ReadFile(args[0])
+      if err == nil {
+        input = string(data)
+      } else {
+        input = args[0]
+      }
+
       if IsPreview {
-        Preview(args[0])
+        Preview(input)
         return
       }
-      Convert(args[0])
+      Convert(input)
       return
     },
   }
@@ -81,12 +93,15 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
-- [ ] lex value for UDTs with no quantity (before lexNumber)
+- [ ] Only look for known modifiers
 - [ ] anything can be a modifier
+  - [ ] make sure we still detect UDTs when the modifier is a string
+- [ ] lex value for UDTs with no quantity (before lexNumber)
 - [ ] UDT followed by UDT - two UDTs
 - [ ] strings
-  - [ ] convert invalid udt to string?
+
 v0.2.0
 - [ ] lex '//' comments
+- [ ] structures
 
 */
