@@ -542,6 +542,9 @@ func lexUDT(l *lexer) stateFn {
 	if !l.scanUDT() {
 		// not a udt - could be string or number
 		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
+		if verbose {
+		  return l.errorf("This shouldn't happen: DT was found to be invalid after scan")
+		}
 		if isAlphaNumeric(l.peek()) {
 		  return lexNumber
 		} else {
@@ -581,10 +584,11 @@ func (l *lexer) scanUDT() bool {
 func (l *lexer) scanUnit() bool {
   log("scanUnit")
 
-  // there could be left arguments already scanned - make sure they're ignored
   start := l.pos
+  word := ""
 
-Loop:  // keep going through until there's a
+  // find the longest potential unit we can
+Loop:
 	for {
 		switch r := l.next(); {
 		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
@@ -592,32 +596,32 @@ Loop:  // keep going through until there's a
 			// absorb
 		default:
 		  l.backup()
-			word := l.input[start:l.pos]
+			word = l.input[start:l.pos]
 			if len(word) == 0 {
 				return false
 			}
-
-			log("unit is " + word)
-
-			for unit := range UDTs {
-				if word == unit {
-					log("it's a known UDT")
-
-					// now we know what the unit is, store so we know which units we have later - speeds up parsing
-					INSTANCES = append(INSTANCES, unit)
-					return true
-				}
-			}
-			for unit := range PDTs {
-				if word == unit {
-					log("it's a known PDT")
-
-					// now we know what the unit is, store so we know which units we have later - speeds up parsing
-					INSTANCES = append(INSTANCES, unit)
-					return true
-				}
-			}
 			break Loop
+		}
+	}
+
+	log("unit is " + word)
+
+	for unit := range UDTs {
+		if word == unit {
+			log("it's a known UDT")
+
+			// now we know what the unit is, store so we know which units we have later - speeds up parsing
+			INSTANCES = append(INSTANCES, unit)
+			return true
+		}
+	}
+	for unit := range PDTs {
+		if word == unit {
+			log("it's a known PDT")
+
+			// now we know what the unit is, store so we know which units we have later - speeds up parsing
+			INSTANCES = append(INSTANCES, unit)
+			return true
 		}
 	}
 	log("it's not a known unit")
