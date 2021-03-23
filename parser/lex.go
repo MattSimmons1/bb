@@ -569,9 +569,12 @@ func lexNumber(l *lexer) stateFn {
 func (l *lexer) scanUDT() bool {
 
 	if l.scanUnit() {  // if starts with a unit then only values or modifiers can come next
-		log("udt with no value")
+		log("DT with no value")
 		if !isSpace(l.peek()) {
-			// next thing could be a modifier, else it's invalid  TODO: right side value
+			l.scanValue() // if there's no value it's ok
+		}
+		if !isSpace(l.peek()) {
+			// next thing could be a modifier, else it's invalid
 			return l.scanModifier()
 		}
 		return true
@@ -667,21 +670,16 @@ func (l *lexer) scanNumber(udt bool) bool {
 
 		if !l.scanUnit() {
 			l.pos = startPos  // reset
-			return false  // if there's no UDT unit now then it's not a UDT (it's a number)
+			return false  // if there's no unit now then it's not a DT (it's a number)
 		}
 
 		if !isSpace(l.peek()) {
-			// next thing could be a modifier, else it's invalid // TODO: or value
+			l.scanValue() // if there's no value that's fine
+		}
+		if !isSpace(l.peek()) {
+			// next thing could be a value or a modifier, else it's invalid (treated as a string)
 			if l.scanModifier() {
 				return true
-			} else if isQuoteChar(l.peek()) || isNumeric(l.peek()) {
-				log("UDT has a value")
-				if l.scanValue() {
-					return true
-				}
-				// value was invalid (e.g. ∆`unclosed string) - must be a string
-				l.pos = startPos  // reset
-				return false
 			} else {
 				l.pos = startPos  // reset
 				return false
@@ -722,7 +720,7 @@ Loop:  // loop for multiple modifier/value pairs
 	return true
 }
 
-// values of modifiers can be numbers, quoted strings, or structures (TODO)
+// values of modifiers can be numbers, quoted strings, or structures TODO JSON (structure)
 func (l *lexer) scanValue() bool {
 	log("scanValue")
 
