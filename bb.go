@@ -96,7 +96,8 @@ MVP
 - [ ] Only look for known modifiers
 - [ ] anything can be a modifier
   - [ ] make sure we still detect UDTs when the modifier is a string
-- [ ] lex value for UDTs with no quantity (before lexNumber)
+- [x] lex value for UDTs with no quantity (before lexNumber)
+- [ ] Invalid DTs
 - [ ] UDT followed by UDT - two UDTs
 - [ ] strings
 

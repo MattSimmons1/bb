@@ -312,11 +312,11 @@ func lexBb(l *lexer) stateFn {
 		return lexRawQuote
 	case r == '\'':
 		return lexChar
-	case couldBeUDT(r) ||  r == '+' || r == '-' || ('0' <= r && r <= '9') || r == '.':
+	case couldBeUDT(r) ||  isNumeric(r):
     // TODO: if it's an invalid udt it could be a string
 		l.backup()  // do not consume the pizza
 		return lexUDT
-	case r == '+' || r == '-' || ('0' <= r && r <= '9') || r == '.':
+	case isNumeric(r):
 		l.backup()
 		return lexNumber
 	case isAlphaNumeric(r):
@@ -569,14 +569,9 @@ func lexNumber(l *lexer) stateFn {
 func (l *lexer) scanUDT() bool {
 
 	if l.scanUnit() {  // if starts with a unit then only values or modifiers can come next
-		log("DT with no value")
-		if !isSpace(l.peek()) {
-			l.scanValue() // if there's no value it's ok
-		}
-		if !isSpace(l.peek()) {
-			// next thing could be a modifier, else it's invalid
-			return l.scanModifier()
-		}
+		log("DT with no quantity")
+		l.scanValue()  // if there's no value it's ok
+		l.scanModifier()  // next thing could be a modifier, else it's invalid TODO reset if invalid?
 		return true
 	}
   return l.scanNumber(true)
@@ -592,7 +587,7 @@ func (l *lexer) scanUnit() bool {
 Loop:  // keep going through until there's a
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || unicode.IsDigit(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
+		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
 			log(string(r))
 			// absorb
 		default:
@@ -673,20 +668,16 @@ func (l *lexer) scanNumber(udt bool) bool {
 			return false  // if there's no unit now then it's not a DT (it's a number)
 		}
 
-		if !isSpace(l.peek()) {
-			l.scanValue() // if there's no value that's fine
-		}
-		if !isSpace(l.peek()) {
-			// next thing could be a value or a modifier, else it's invalid (treated as a string)
-			if l.scanModifier() {
-				return true
-			} else {
-				l.pos = startPos  // reset
-				return false
-			}
-		}
-
+		l.scanValue() // if there's no value that's fine
+		l.scanModifier()  // scans until we get to an unknown modifier (start of something else)
 		return true
+		// next thing could be a value or a modifier, else it's invalid (treated as a string)
+		//if l.scanModifier() {
+		//	return true
+		//} else {
+		//	l.pos = startPos  // reset
+		//	return false
+		//}
 
 	} else {  // for numbers only:
 		// Next thing mustn't be alphanumeric.
@@ -699,12 +690,12 @@ func (l *lexer) scanNumber(udt bool) bool {
 	}
 }
 
-func (l *lexer) scanModifier() bool {
+func (l *lexer) scanModifier() {  // stops when the next character isn't part of the same DT
 	log("scanModifier")
 
 Loop:  // loop for multiple modifier/value pairs
 	for {
-		if isSpace(l.peek()) { // end of UDT
+		if isSpace(l.peek()) { // end of DT
 			break Loop
 		}
 
@@ -713,11 +704,10 @@ Loop:  // loop for multiple modifier/value pairs
 			l.scanValue()
 		} else {  // invalid
 		  log(string(l.peek()) + " is not a modifier")
-			return false
+			break Loop
 		}
 
 	}
-	return true
 }
 
 // values of modifiers can be numbers, quoted strings, or structures TODO JSON (structure)
