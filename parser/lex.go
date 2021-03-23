@@ -45,35 +45,15 @@ const (
 	itemBool                         // boolean constant
 	itemChar                         // printable ASCII character; grab bag for comma etc.
 	itemCharConstant                 // character constant
-	itemComment                      // comment text
-	itemComplex                      // complex constant (1+2i); imaginary is just a number
-	itemAssign                       // equals ('=') introducing an assignment
-	itemDeclare                      // colon-equals (':=') introducing a declaration
 	itemEOF
-	itemField      // alphanumeric identifier starting with '.'
-	itemIdentifier // alphanumeric identifier not starting with '.'
 	itemLeftParen  // '(' inside action
 	itemNumber     // simple number, including imaginary
 	itemPipe       // pipe symbol
 	itemRawString  // raw quoted string (includes quotes)
-	itemRightDelim // right action delimiter
 	itemRightParen // ')' inside action
 	itemSpace      // run of spaces separating arguments
 	itemString     // quoted string (includes quotes)
-	itemText       // plain text
-	itemVariable   // variable starting with '$', such as '$' or  '$1' or '$hello'
-	// Keywords appear after all the rest.
 	itemKeyword  // used only to delimit the keywords
-	itemBlock    // block keyword
-	itemDot      // the cursor, spelled '.'
-	itemDefine   // define keyword
-	itemElse     // else keyword
-	itemEnd      // end keyword
-	itemIf       // if keyword
-	itemNil      // the untyped nil constant, easiest to treat as a keyword
-	itemRange    // range keyword
-	itemTemplate // template keyword
-	itemWith     // with keyword
 	itemUDT      // user defined type
 	itemTab      // two or more spaces or a tab
 	itemDefinition  // type definition, e.g. ∆ = { unit: pizza }
@@ -85,58 +65,25 @@ var itemNames = []string{
 "Bool",         // boolean constant
 "Char",         // printable ASCII character; grab bag for comma etc.
 "CharConstant", // character constant
-"Comment",                     // comment text
-"Complex",                     // complex constant (1+2i); imaginary is just a number
-"Assign",                      // equals ('=') introducing an assignment
-"Declare",                     // colon-equals (':=') introducing a declaration
 "EOF",
-"Field",      // alphanumeric identifier starting with '.'
-"Identifier", // alphanumeric identifier not starting with '.'
 "LeftParen",  // '(' inside action
 "Number",     // simple number, including imaginary
 "Pipe",       // pipe symbol
 "RawString",  // raw quoted string (includes quotes)
-"RightDelim", // right action delimiter
 "RightParen", // ')' inside action
 "space",      // run of spaces separating arguments
 "String",    // quoted string (includes quotes)
-"Text",      // plain text
-"Variable",  // variable starting with '$', such as '$' or  '$1' or '$hello'
-// Keywords appear after all the rest.
 "Keyword", // used only to delimit the keywords
-"Block",   // block keyword
-"Dot",     // the cursor, spelled '.'
-"Define",  // define keyword
-"Else",    // else keyword
-"End",     // end keyword
-"If",      // if keyword
-"Nil",      // the untyped nil constant, easiest to treat as a keyword
-"Range",    // range keyword
-"Template", // template keyword
-"With",     // with keyword
 "UDT",      // user defined type
 "tab",      // two or more spaces or a tab
 "definition",
 "Newline",  // \n
 }
 
-var key = map[string]itemType{
-	".":        itemDot,
-	"block":    itemBlock,
-	"define":   itemDefine,
-	"else":     itemElse,
-	"end":      itemEnd,
-	"if":       itemIf,
-	"range":    itemRange,
-	"nil":      itemNil,
-	"template": itemTemplate,
-	"with":     itemWith,
-}
-
 const eof = -1
 
 const (
-	modifiers     = "+~=<>:;/|#&≠≥≤^"  // all potential modifiers
+	modifiers     = "+~<>:;/|#&≠≥≤^"  // all potential modifiers
 	quotes        = "`\""
 )
 
@@ -442,52 +389,6 @@ Loop:
   return lexBb
 }
 
-// lexField scans a field: .Alphanumeric.
-// The . has been scanned.
-func lexField(l *lexer) stateFn {
-	return lexFieldOrVariable(l, itemField)
-}
-
-// lexVariable scans a Variable: $Alphanumeric.
-// The $ has been scanned.
-func lexVariable(l *lexer) stateFn {
-	log("lexVariable")
-
-	if l.atTerminator() { // Nothing interesting follows -> "$".
-		l.emit(itemVariable)
-		return lexBb
-	}
-	return lexFieldOrVariable(l, itemVariable)
-}
-
-// lexVariable scans a field or variable: [.$]Alphanumeric.
-// The . or $ has been scanned.
-func lexFieldOrVariable(l *lexer, typ itemType) stateFn {
-	log("lexFieldOrVariable")
-
-	if l.atTerminator() { // Nothing interesting follows -> "." or "$".
-		if typ == itemVariable {
-			l.emit(itemVariable)
-		} else {
-			l.emit(itemDot)
-		}
-		return lexBb
-	}
-	var r rune
-	for {
-		r = l.next()
-		if !isAlphaNumeric(r) {
-			l.backup()
-			break
-		}
-	}
-	if !l.atTerminator() {
-		return l.errorf("bad character %#U", r)
-	}
-	l.emit(typ)
-	return lexBb
-}
-
 // atTerminator reports whether the input is at valid termination character to
 // appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
 // like "$x+2" not being acceptable without a space, in case we decide one
@@ -501,12 +402,6 @@ func (l *lexer) atTerminator() bool {
 	case eof, '.', ',', '|', ':', ')', '(':
 		return true
 	}
-	// Does r start the delimiter? This can be ambiguous (with delim=="//", $x/2 will
-	// succeed but should fail) but only in extremely rare cases caused by willfully
-	// bad choice of delimiter.
-	//if rd, _ := utf8.DecodeRuneInString(l.rightDelim); rd == r {
-	//	return true
-	//}
 	return false
 }
 
@@ -535,25 +430,41 @@ Loop:
 
 // scans something that could be a UDT, an invalid UDT, or a string
 // the unit could be multiple different units that start with the same letter
+// it could also be a definition
 // We have not consumed any characters
 func lexUDT(l *lexer) stateFn {
 	log("lexUDT")
+	start := l.pos
 
-	if !l.scanUDT() {
-		// not a udt - could be string or number
-		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
-		if verbose {
-		  return l.errorf("This shouldn't happen: DT was found to be invalid after scan")
+	if isNumeric(l.peek()) {  // if starts with quantity - scan the number then the unit
+		if l.scanNumber(true) {
+			l.emit(itemUDT)
+			return lexBb
+		} else {  // not a DT so must be a number - can't be anything else because it starts with a number
+		  l.pos = start
+			return lexNumber
 		}
-		if isAlphaNumeric(l.peek()) {
-		  return lexNumber
+	} else if l.scanUnit() {  // must start with a unit, or could be string or identifier
+
+		log("DT with no quantity")
+
+		l.scanValue()  // if there's no value it's ok
+		l.scanModifier()  // next thing could be a modifier
+
+		l.emit(itemUDT)
+		return lexBb
+	} else {  // not a udt - could be string or identifier
+		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
+		if isNumeric(l.peek()) {
+			if verbose {
+			 return l.errorf("This shouldn't happen: DT was found to be a number after scanning for numbers")
+			}
+			return lexNumber
 		} else {
+			log("must be a definition or key word")
 			return lexIdentifier
 		}
 	}
-	l.emit(itemUDT)
-
-	return lexBb
 }
 
 // lexNumber scans a number: decimal, octal, hex, float, or imaginary. This
@@ -569,18 +480,7 @@ func lexNumber(l *lexer) stateFn {
 	return lexBb
 }
 
-func (l *lexer) scanUDT() bool {
-
-	if l.scanUnit() {  // if starts with a unit then only values or modifiers can come next
-		log("DT with no quantity")
-		l.scanValue()  // if there's no value it's ok
-		l.scanModifier()  // next thing could be a modifier, else it's invalid TODO reset if invalid?
-		return true
-	}
-  return l.scanNumber(true)
-}
-
-// check if the next few chars could be a UDT unit
+// check if the next few chars could be a UDT unit - backtrack if not
 func (l *lexer) scanUnit() bool {
   log("scanUnit")
 
@@ -604,29 +504,47 @@ Loop:
 		}
 	}
 
-	log("unit is " + word)
+  // now we have the full word we need to make sure it's not a definition
+	// look-ahead for assignment
+	l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
+	if l.accept("=") {  // todo: make '=' optional
+	  l.pos = start  // backtrack
+		return false
+	}
+
+  // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
+	// e.g. UDTs are `W`. Input is `Wb`. Assumed to be [`W`, `b`].
+	log("looking for a unit to match '" + word + "'")
+
+  bestUnit := ""
 
 	for unit := range UDTs {
-		if word == unit {
-			log("it's a known UDT")
-
-			// now we know what the unit is, store so we know which units we have later - speeds up parsing
-			INSTANCES = append(INSTANCES, unit)
-			return true
+		if strings.HasPrefix(word, unit) && len(unit) > len(bestUnit) {
+			log("it could be UDT '" + unit + "'")
+			bestUnit = unit
 		}
 	}
-	for unit := range PDTs {
-		if word == unit {
-			log("it's a known PDT")
 
-			// now we know what the unit is, store so we know which units we have later - speeds up parsing
-			INSTANCES = append(INSTANCES, unit)
-			return true
+	if bestUnit == "" {
+		for unit := range PDTs {
+			if strings.HasPrefix(word, unit) && len(unit) > len(bestUnit) {
+				log("it could be PDT '" + unit + "'")
+				bestUnit = unit
+			}
 		}
 	}
-	log("it's not a known unit")
 
-	return false  // unit found did not match known unit - could be a string
+  if bestUnit != "" {
+		log("unit is " + bestUnit)
+		// now we know what the unit is, store so we know which units we have later - speeds up parsing
+		INSTANCES = append(INSTANCES, bestUnit)
+		l.pos = start + Pos(len(bestUnit))  // backtrack to the end of the unit
+		return true
+	} else {
+	  log("it's not a known unit")
+		l.pos = start  // backtrack
+		return false  // unit found did not match any known unit - could be a string
+	}
 }
 
 // determine if we have a valid number or udt
@@ -634,36 +552,16 @@ func (l *lexer) scanNumber(udt bool) bool {
 	startPos := l.pos
 
 	if udt {
-	  log("scanUDT")
+	  log("scanUDT (scanNumber)")
 	} else {
 		log("scanNumber")
 	}
-	// Optional leading sign.
-	l.accept("+-")
-	// Is it hex?
-	digits := "0123456789_"
-	if l.accept("0") {
-		// Note: Leading 0 does not mean octal in floats.
-		if l.accept("xX") {
-			digits = "0123456789abcdefABCDEF_"
-		} else if l.accept("oO") {
-			digits = "01234567_"
-		} else if l.accept("bB") {
-			digits = "01_"
-		}
-	}
-	l.acceptRun(digits)
+	l.accept("-")  // Optional leading sign. bb does not allow leading +
+	l.acceptRun("0123456789")
 	if l.accept(".") {
-		l.acceptRun(digits)
+		l.acceptRun("0123456789")
 	}
-	if len(digits) == 10+1 && l.accept("eE") {
-		l.accept("+-")
-		l.acceptRun("0123456789_")
-	}
-	if len(digits) == 16+6+1 && l.accept("pP") {
-		l.accept("+-")
-		l.acceptRun("0123456789_")
-	}
+
 	// accept UDT character(s) at the end
 	if udt {
 
@@ -675,18 +573,10 @@ func (l *lexer) scanNumber(udt bool) bool {
 		l.scanValue() // if there's no value that's fine
 		l.scanModifier()  // scans until we get to an unknown modifier (start of something else)
 		return true
-		// next thing could be a value or a modifier, else it's invalid (treated as a string)
-		//if l.scanModifier() {
-		//	return true
-		//} else {
-		//	l.pos = startPos  // reset
-		//	return false
-		//}
 
 	} else {  // for numbers only:
 		// Next thing mustn't be alphanumeric.
 		if isAlphaNumeric(l.peek()) {
-			l.next()
 			l.pos = startPos  // reset
 			return false
 		}
@@ -798,6 +688,8 @@ Loop:
 	l.emit(itemRawString)
 	return lexBb
 }
+
+// TODO: = is reserved for definitons
 
 func isModifierChar(r rune) bool {
 	return strings.ContainsRune(modifiers, r)
