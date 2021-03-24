@@ -331,13 +331,13 @@ func lexIdentifier(l *lexer) stateFn {
 Loop:
 	for {
 		switch r := l.next(); {
-		case isUnitChar(r):
+		case r != '=' && isUnitChar(r):  // catch assignment with no space before '='
 			// absorb.
 		default:
 			l.backup()
 			word := l.input[l.start:l.pos]
-			if !l.atTerminator() {
-				return l.errorf("bad character %#U", r)
+			if !l.atTerminator() && r != '=' {
+				return l.errorf("bad character %#U", r)  // TODO: is there such a thing?
 			}
 			switch {
 			case word == "true", word == "false":
@@ -347,11 +347,10 @@ Loop:
 
 				// look-ahead for assignment
 				l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
-				if l.accept("=") {  // todo: make '=' optional
+				if l.accept("=") {
 					return lexDefinition
 				}
 				l.emit(itemString)
-				//l.emit(itemIdentifier)
 			}
 			break Loop
 		}
@@ -507,7 +506,7 @@ Loop:
   // now we have the full word we need to make sure it's not a definition
 	// look-ahead for assignment
 	l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
-	if l.accept("=") {  // todo: make '=' optional
+	if l.accept("=") {
 	  l.pos = start  // backtrack
 		return false
 	}

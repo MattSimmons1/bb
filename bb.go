@@ -98,8 +98,8 @@ MVP
   - [ ] make sure we still detect UDTs when the modifier is a string
 - [x] lex value for UDTs with no quantity (before lexNumber)
 - [ ] Invalid DTs
-- [ ] UDT followed by UDT - two UDTs
-- [ ] strings
+- [x] UDT followed by UDT - two UDTs
+- [x] strings
 
 v0.2.0
 - [ ] lex '//' comments

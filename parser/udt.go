@@ -2,6 +2,7 @@
 package parser
 
 import (
+  "fmt"
   "strconv"
   "strings"
   "unicode"
@@ -29,8 +30,12 @@ func NewUDTFromDefinition(definition string) {
   log("Define new UDT with " + definition)
 
   // extract just the unit
-  i := strings.Index(definition, " ")
+  i := strings.Index(definition, " ")  // TODO: allow no spaces
+  if i == -1 {
+    i = strings.Index(definition, "=")
+  }
   unit := definition[:i]
+  log("unit is " + unit)
   definition = definition[i:]
 
   for {  // remove leading spaces, '=', and '{'
@@ -43,7 +48,9 @@ func NewUDTFromDefinition(definition string) {
 
   for {  // remove trailing spaces and '}'
     l := len(definition) - 1
-    if definition[l] == ' ' || definition[l] == '}' {
+    if l == -1 {
+      break  // definition is nil
+    } else if definition[l] == ' ' || definition[l] == '}' {
       definition = definition[:l]
     } else {
       break
@@ -57,9 +64,14 @@ func NewUDTFromDefinition(definition string) {
   // TODO: allow commas in strings!
   // split definition into props
   props := strings.Split(definition, ",")
+  fmt.Print(props)
 
   for _, prop := range props {
     p := strings.SplitN(prop, ":", 2)
+    if len(p) < 2 {
+      log("INVALID PROPS")
+      continue
+    }
     p[0] = strings.TrimSpace(p[0])
     p[1] = strings.TrimSpace(p[1])
     // TODO: remove quotes around prop names
@@ -77,8 +89,6 @@ func NewUDTFromDefinition(definition string) {
       stringProps[p[0]] = p[1]
     }
   }
-
-  log("unit is " + unit)
 
   t := NewUDT(unit, numericalProps, stringProps, modifiers)
 
