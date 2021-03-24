@@ -57,6 +57,8 @@ func UnitTest() {
 
 	testInput := "∆ = { unit: pizza, length: 2, +: extra large, ;:slices, #: on my tab, >: comment }\n" +
 		           "§µ🚀 = { unit: baseball caps }\n" +
+		           "+={}\n" +
+		           "*={}\n" +
 		           "gg𓂀={}\n" +
 		           "£2£ gg𓂀 9g\"# w\\\"ow\" ∆ 346 1元100 100°C hello §µ🚀 ∆+ 34∆-2.0 3.4∆;12+23#>`hello` \"hello\"\n/*comment*/"
 	l := lex(testInput)
