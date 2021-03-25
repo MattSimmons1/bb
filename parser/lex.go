@@ -257,9 +257,7 @@ func lexBb(l *lexer) stateFn {
 		return lexQuote
 	case r == '`':
 		return lexRawQuote
-	case r == '\'':
-		return lexChar
-	case couldBeUDT(r) ||  isNumeric(r):
+	case couldBeUDT(r) || isNumeric(r):
     // TODO: if it's an invalid udt it could be a string
 		l.backup()  // do not consume the pizza
 		return lexUDT
@@ -269,23 +267,12 @@ func lexBb(l *lexer) stateFn {
 	case isAlphaNumeric(r):
 		l.backup()
 		return lexIdentifier
-	case r == '(':
-		l.emit(itemLeftParen)
-		l.parenDepth++
-	case r == ')':
-		l.emit(itemRightParen)
-		l.parenDepth--
-		if l.parenDepth < 0 {
-			return l.errorf("unexpected right paren %#U", r)
-		}
 	case r == '/':
 		if l.accept("*") {
 		  return lexComment
 		} else {
-			return lexIdentifier  // TODO: this might be invalid
+			return lexIdentifier
 		}
-	case r <= unicode.MaxASCII && unicode.IsPrint(r):
-		l.emit(itemChar)
 	default:
 		return lexIdentifier  // all unicode is allowed, so assume everything else is the start of a definition
 	}
@@ -490,7 +477,7 @@ func (l *lexer) scanUnit() bool {
 Loop:
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r)):  // if non unit character
+		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r) || r == '='):  // if non unit character
 			log(string(r))
 			// absorb
 		default:
@@ -509,6 +496,8 @@ Loop:
 	if l.accept("=") {
 	  l.pos = start  // backtrack
 		return false
+	} else {
+		log("it's not a definition")
 	}
 
   // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
