@@ -93,7 +93,7 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
-- [ ] nulls
+- [x] nulls
 - [ ] import currency and SI
 - [ ] don't fail for '£'
 - [ ] Only look for known modifiers
@@ -101,8 +101,7 @@ MVP
   - [ ] make sure we still detect UDTs when the modifier is a string
 - [x] lex value for UDTs with no quantity (before lexNumber)
 - [ ] Invalid DTs
-- [x] UDT followed by UDT - two UDTs
-- [x] strings
+- [ ] rows should become an array
 
 v0.2.0
 - [ ] lex '//' comments

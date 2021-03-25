@@ -240,6 +240,15 @@ func lexComment(l *lexer) stateFn {
 	return lexBb
 }
 
+func lexInlineComment(l *lexer) stateFn {
+	log("lexInlineComment")
+	i := strings.Index(l.input[l.pos:], "\n")  // there will always be one because we add one
+	l.pos += Pos(i)
+	// TODO: read comment for special values
+	l.ignore()
+	return lexBb
+}
+
 // lexBb scans bb
 func lexBb(l *lexer) stateFn {
 	log("lexBb")
@@ -270,6 +279,8 @@ func lexBb(l *lexer) stateFn {
 	case r == '/':
 		if l.accept("*") {
 		  return lexComment
+		} else if l.accept("/") {
+			return lexInlineComment
 		} else {
 			return lexIdentifier
 		}
