@@ -60,7 +60,8 @@ func UnitTest() {
 		           "+={}\n" +
 		           "*={}\n" +
 		           "gg𓂀={}\n" +
-		           "£2£ gg𓂀 9g\"# w\\\"ow\" ∆ 346 1元100 100°C hello §µ🚀 ∆+ 34∆-2.0 3.4∆;12+23#>`hello` \"hello\"\n/*comment*/"
+		           "g={}\n" +
+		           "gg𓂀 9g\"# w\\\"ow\" ∆ 346 hello §µ🚀 ∆+ 34∆-2.0 3.4∆;12+23#>`hello` \"hello\"\n/*comment*/"
 	l := lex(testInput)
 
 	for item := range l.items {

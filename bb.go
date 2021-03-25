@@ -93,6 +93,9 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
+- [ ] nulls
+- [ ] import currency and SI
+- [ ] don't fail for '£'
 - [ ] Only look for known modifiers
 - [ ] anything can be a modifier
   - [ ] make sure we still detect UDTs when the modifier is a string

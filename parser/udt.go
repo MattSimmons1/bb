@@ -242,50 +242,50 @@ func ParseUDT(input string) map[string]interface{} {
 }
 
 func defineBuiltInTypes() {
-  SITypes := []string{
-    "g,gram,weight",
-    "kg,kilogram,weight",
-    "s,second,time",
-    "min,minute,time",
-    "h,hour,time",
-    "d,day,time",
-    "m,metre,length",
-    "km,kilometre,length",
-    "au,astronomical unit,length",
-    "l,litre,volume",
-    "K,kelvin,temperature",
-    "A,ampere,electric current",
-    "mol,mole,amount of substance",
-    "cd,candela,luminous intensity",
-    "rad,radian,plane angle",
-    "sr,steradian,solid angle",
-    "Hz,hertz,frequency",
-    "N,newton,force",
-    "Pa,pascal,pressure",
-    "J,joule,energy",
-    "eV,electron volt,energy",
-    "W,watt,power",
-    "C,coulomb,electric charge",
-    "V,volt,voltage",
-    "F,farad,capacitance",
-    "Ω,ohm,resistance",
-    "S,siemens,electrical conductance",
-    "Wb,weber,magnetic flux",
-    "T,tesla,magnetic flux density",
-    "H,henry,inductance",
-    "°C,Celsius,temperature",
-    "lm,lumen,luminous flux",
-    "lx,lux,illuminance",
-    "Bq,becquerel,radioactivity",
-    "Gy,gray,absorbed dose",
-    "Sv,sievert,equivalent dose",
-    "kat,katal,catalytic activity",
-  }
-
-  for _, t := range SITypes {
-    def := strings.SplitN(t, ",", 3)
-    PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] }, map[rune]Modifier{})
-  }
+  //SITypes := []string{ - TODO: make optional
+  //  "g,gram,weight",
+  //  "kg,kilogram,weight",
+  //  "s,second,time",
+  //  "min,minute,time",
+  //  "h,hour,time",
+  //  "d,day,time",
+  //  "m,metre,length",
+  //  "km,kilometre,length",
+  //  "au,astronomical unit,length",
+  //  "l,litre,volume",
+  //  "K,kelvin,temperature",
+  //  "A,ampere,electric current",
+  //  "mol,mole,amount of substance",
+  //  "cd,candela,luminous intensity",
+  //  "rad,radian,plane angle",
+  //  "sr,steradian,solid angle",
+  //  "Hz,hertz,frequency",
+  //  "N,newton,force",
+  //  "Pa,pascal,pressure",
+  //  "J,joule,energy",
+  //  "eV,electron volt,energy",
+  //  "W,watt,power",
+  //  "C,coulomb,electric charge",
+  //  "V,volt,voltage",
+  //  "F,farad,capacitance",
+  //  "Ω,ohm,resistance",
+  //  "S,siemens,electrical conductance",
+  //  "Wb,weber,magnetic flux",
+  //  "T,tesla,magnetic flux density",
+  //  "H,henry,inductance",
+  //  "°C,Celsius,temperature",
+  //  "lm,lumen,luminous flux",
+  //  "lx,lux,illuminance",
+  //  "Bq,becquerel,radioactivity",
+  //  "Gy,gray,absorbed dose",
+  //  "Sv,sievert,equivalent dose",
+  //  "kat,katal,catalytic activity",
+  //}
+  //
+  //for _, t := range SITypes {
+  //  def := strings.SplitN(t, ",", 3)
+  //  PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] }, map[rune]Modifier{})
+  //}
 
   //Quantity	Name	Symbol	Value in SI units
   //plane and
@@ -298,18 +298,18 @@ func defineBuiltInTypes() {
   //bel	B
   //decibel	dB
 
-  // currency
-  currencyTypes := []string{
-    "$,United States dollar",
-    "£,Great British pound sterling",
-    "¥,Japanese yen",
-    "円,Japanese yen",
-    "元,Chinese renminbi yuan",
-  }
-  for _, t := range currencyTypes {
-    def := strings.SplitN(t, ",", 2)
-    PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": "money" }, map[rune]Modifier{})
-  }
+  // currency - TODO: make optional
+  //currencyTypes := []string{
+  //  "$,United States dollar",
+  //  "£,Great British pound sterling",
+  //  "¥,Japanese yen",
+  //  "円,Japanese yen",
+  //  "元,Chinese renminbi yuan",
+  //}
+  //for _, t := range currencyTypes {
+  //  def := strings.SplitN(t, ",", 2)
+  //  PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": "money" }, map[rune]Modifier{})
+  //}
 }
 
 // return true if a rune could be the start of a udt - slightly faster than checking the whole thing
