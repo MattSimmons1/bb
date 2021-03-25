@@ -2,7 +2,6 @@
 package parser
 
 import (
-  "fmt"
   "strconv"
   "strings"
   "unicode"
@@ -64,7 +63,6 @@ func NewUDTFromDefinition(definition string) {
   // TODO: allow commas in strings!
   // split definition into props
   props := strings.Split(definition, ",")
-  fmt.Print(props)
 
   for _, prop := range props {
     p := strings.SplitN(prop, ":", 2)

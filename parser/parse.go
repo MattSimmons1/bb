@@ -9,8 +9,8 @@ import (
 )
 
 func removeQuotes(s string) string {
-	if s[:1] == `"` {
-		if s[len(s)-1:] == `"` {
+	if quoteChar := s[:1]; quoteChar == `"` || quoteChar == "`" {
+		if s[len(s)-1:] == quoteChar {
 			return s[1:len(s)-1]
 		}
 	}
@@ -42,6 +42,8 @@ func Parse(input string) []interface{} {
 			} else {
 			  row = append(row, false)
 			}
+		} else if item.typ == itemNull {
+			row = append(row, nil)
 		} else if item.typ == itemUDT {
 			row = append(row, ParseUDT(item.val))
 		} else {

@@ -21,12 +21,12 @@ These can't be used as units or modifiers
 | Character  | Meaning  |
 |------------|----------|
 | **=**      | Defines a type |
-| **{** and **}** | Start and end of a code block |
+| **{** and **}** | Start and end of a code block or structure |
 
 ### Key Words
 
-| Unit  | Meaning  |
-|-------|----------|
-| true  | JSON true |
+| Unit  | Meaning    |
+|-------|------------|
+| true  | JSON true  |
 | false | JSON false |
-| null  | JSON null |
+| null  | JSON null  |

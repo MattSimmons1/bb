@@ -43,13 +43,13 @@ type itemType int
 const (
 	itemError        itemType = iota // error occurred; value is text of error
 	itemBool                         // boolean constant
+	itemNull                         // JSON null
 	itemChar                         // printable ASCII character; grab bag for comma etc.
 	itemCharConstant                 // character constant
 	itemEOF
 	itemLeftParen  // '(' inside action
 	itemNumber     // simple number, including imaginary
 	itemPipe       // pipe symbol
-	itemRawString  // raw quoted string (includes quotes)
 	itemRightParen // ')' inside action
 	itemSpace      // run of spaces separating arguments
 	itemString     // quoted string (includes quotes)
@@ -63,13 +63,13 @@ const (
 var itemNames = []string{
 "itemError",
 "Bool",         // boolean constant
+"Null",         // JSON null
 "Char",         // printable ASCII character; grab bag for comma etc.
 "CharConstant", // character constant
 "EOF",
 "LeftParen",  // '(' inside action
 "Number",     // simple number, including imaginary
 "Pipe",       // pipe symbol
-"RawString",  // raw quoted string (includes quotes)
 "RightParen", // ')' inside action
 "space",      // run of spaces separating arguments
 "String",    // quoted string (includes quotes)
@@ -329,6 +329,8 @@ Loop:
 			switch {
 			case word == "true", word == "false":
 				l.emit(itemBool)
+			case word == "null":
+				l.emit(itemNull)
 			default:
 				log("word is " + word)
 
@@ -490,14 +492,16 @@ Loop:
 		}
 	}
 
-  // now we have the full word we need to make sure it's not a definition
+  // now we have the full word we need to make sure it's not a definition or key word
 	// look-ahead for assignment
 	l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
 	if l.accept("=") {
 	  l.pos = start  // backtrack
 		return false
-	} else {
-		log("it's not a definition")
+	}
+  if word == "true" || word == "false" || word == "null" {
+		l.pos = start  // backtrack
+		return false  // it's a key word
 	}
 
   // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
@@ -673,7 +677,7 @@ Loop:
 			break Loop
 		}
 	}
-	l.emit(itemRawString)
+	l.emit(itemString)
 	return lexBb
 }
 
@@ -721,6 +725,10 @@ func Preview(input string) {
 			colour = "91"
 		} else if item.typ == itemDefinition {
 			colour = "90"
+		} else if item.typ == itemBool {
+			colour = "95"
+		} else if item.typ == itemNull {
+			colour = "96"
 		}
 
 		fmt.Print("\033[", colour, "m", item.val, "\033[0m")
