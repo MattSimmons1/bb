@@ -638,6 +638,7 @@ Loop:
 				l.errorf("unterminated quoted string")
 				return false
 			}
+			fallthrough
 		default:
 			if quoted {
         if r != quoteChar {

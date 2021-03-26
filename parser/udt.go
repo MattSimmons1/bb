@@ -179,6 +179,11 @@ func (t *udt) Parse(s string) map[string]interface{} {
       }
       // next char must be a modifier
       m := t.Modifiers[rune(s[pos:pos+1][0])]
+      if m.name == "" {
+        log(s[pos:pos+1])
+        log("THIS SHOULDN'T HAPPEN - modifier is empty")
+        break
+      }
       log("found modifier: " + m.name)
       pos++
       // find the next modifier
