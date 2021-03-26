@@ -109,8 +109,12 @@ func (t *udt) Parse(s string) map[string]interface{} {
   if quantity == "" {
     quantity = "1"
   }
-  number, _ := strconv.ParseFloat(quantity, 64)
-  data["quantity"] = number
+  number, err := strconv.ParseFloat(quantity, 64)
+  if err != nil {
+    data["quantity"] = quantity  // invalid quantities are kept as string, e.g. 1.0.0
+  } else {
+    data["quantity"] = number
+  }
 
   pos += len(t.Unit)
 
@@ -157,9 +161,11 @@ func (t *udt) Parse(s string) map[string]interface{} {
       }
       number, err := strconv.ParseFloat(s[valueIdx:pos], 64)
       if err != nil {
-        panic(err)
+        data["value"] = s[valueIdx:pos]  // invalid values are kept as string, e.g. 1.0.0
+      } else {
+        data["value"] = number
+
       }
-      data["value"] = number
     }
   }
 
@@ -179,11 +185,6 @@ func (t *udt) Parse(s string) map[string]interface{} {
       }
       // next char must be a modifier
       m := t.Modifiers[rune(s[pos:pos+1][0])]
-      if m.name == "" {
-        log(s[pos:pos+1])
-        log("THIS SHOULDN'T HAPPEN - modifier is empty")
-        break
-      }
       log("found modifier: " + m.name)
       pos++
       // find the next modifier

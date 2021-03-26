@@ -21,7 +21,9 @@ These can't be used as units or modifiers
 | Character  | Meaning  |
 |------------|----------|
 | **=**      | Defines a type |
-| **{** and **}** | Start and end of a code block or structure |
+| **.**      | Decimal point  |
+| **-**      | Negative sign  |
+| **{** **}** | Start and end of a code block or structure |
 
 ### Key Words
 

@@ -95,7 +95,7 @@ To Do
 MVP
 - [x] nulls
 - [ ] import currency and SI
-- [ ] don't fail for '£'
+- [x] don't fail for '£'
 - [ ] Only look for known modifiers
 - [ ] anything can be a modifier
   - [ ] make sure we still detect UDTs when the modifier is a string
@@ -103,8 +103,8 @@ MVP
 - [ ] Invalid DTs
 - [ ] rows should become an array
 
-v0.2.0
-- [ ] lex '//' comments
-- [ ] structures
+v1.0.0
+- [ ] structures/arrays
+- JS functions
 
 */
