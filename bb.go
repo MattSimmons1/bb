@@ -19,8 +19,10 @@ func Preview(input string) {
   parser.Preview(input)
 }
 
-func UnitTest() {
-  parser.UnitTest()
+func Debug(input string) {
+  input = strings.Replace(input, "\\n", "\n", -1)  // convert raw escaped chars to literals
+  input = strings.Replace(input, "\\t", "\t", -1)
+  parser.Debug(input)
 }
 
 func Convert(input string) {
@@ -41,6 +43,7 @@ func Convert(input string) {
 func main() {
 if err := func() (rootCmd *cobra.Command) {
   var IsPreview bool
+  var IsDebug bool
 
   rootCmd = &cobra.Command{
     Use: "bb",
@@ -62,6 +65,11 @@ if err := func() (rootCmd *cobra.Command) {
         input = args[0]
       }
 
+      if IsDebug {
+        Debug(input)
+        return
+      }
+
       if IsPreview {
         Preview(input)
         return
@@ -73,16 +81,9 @@ if err := func() (rootCmd *cobra.Command) {
   rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
     "view the interpretation of the input without converting")
 
-  rootCmd.AddCommand(func() (createCmd *cobra.Command) {
-    createCmd = &cobra.Command{
-      Use:   "test",
-      Short: "run unit tests",
-      Run: func(c *cobra.Command, args []string){
-        UnitTest()
-      },
-    }
-    return
-  }())
+  rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
+    "show each step of the parsing process")
+
   return
   }().Execute(); err != nil {
     log.Panicln(err)
@@ -105,6 +106,6 @@ MVP
 
 v1.0.0
 - [ ] structures/arrays
-- JS functions
+- [ ] JS functions
 
 */

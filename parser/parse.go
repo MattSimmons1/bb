@@ -54,18 +54,10 @@ func Parse(input string) []interface{} {
   return row
 }
 
-func UnitTest() {
+func Debug(input string) {
 	verbose = true
 
-	testInput := "∆ = { unit: pizza, length: 2, +: extra large, ;:slices, #: on my tab, >: comment }\n" +
-		           "§µ🚀 = { unit: baseball caps }\n" +
-		           "+={}\n" +
-		           "£={} /* this is a comment\n" +
-		           "*/ gg𓂀={} //this is a comment\n" +
-		           "g={}\n" +
-		           "£44.40\n" +
-		           "gg𓂀 9g\"# w\\\"ow\" ∆ 346 hello §µ🚀 ∆+ 34∆-2.0 3.4∆;12+23#>`hello` \"hello\"\n/*comment*/ //"
-	l := lex(testInput)
+	l := lex(input)
 
 	for item := range l.items {
 		value := ""
@@ -93,8 +85,4 @@ func UnitTest() {
 	}
 
 	fmt.Print("\n\n")
-}
-
-func init() {
-	defineBuiltInTypes()
 }

@@ -44,13 +44,9 @@ const (
 	itemError        itemType = iota // error occurred; value is text of error
 	itemBool                         // boolean constant
 	itemNull                         // JSON null
-	itemChar                         // printable ASCII character; grab bag for comma etc.
-	itemCharConstant                 // character constant
 	itemEOF
-	itemLeftParen  // '(' inside action
 	itemNumber     // simple number, including imaginary
 	itemPipe       // pipe symbol
-	itemRightParen // ')' inside action
 	itemSpace      // run of spaces separating arguments
 	itemString     // quoted string (includes quotes)
 	itemKeyword  // used only to delimit the keywords
@@ -64,13 +60,9 @@ var itemNames = []string{
 "itemError",
 "Bool",         // boolean constant
 "Null",         // JSON null
-"Char",         // printable ASCII character; grab bag for comma etc.
-"CharConstant", // character constant
 "EOF",
-"LeftParen",  // '(' inside action
 "Number",     // simple number, including imaginary
 "Pipe",       // pipe symbol
-"RightParen", // ')' inside action
 "space",      // run of spaces separating arguments
 "String",    // quoted string (includes quotes)
 "Keyword", // used only to delimit the keywords
@@ -243,8 +235,14 @@ func lexComment(l *lexer) stateFn {
 func lexInlineComment(l *lexer) stateFn {
 	log("lexInlineComment")
 	i := strings.Index(l.input[l.pos:], "\n")  // there will always be one because we add one
+
+	log("comment is: " + l.input[l.pos:l.pos+Pos(i)])
+	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
+	splitComment := strings.SplitN(cleanedComment, " ", 2)
+	if splitComment[0] == "import" && len(splitComment) > 1 {
+		defineBuiltInTypes(strings.ToLower(splitComment[1]))
+	}
 	l.pos += Pos(i)
-	// TODO: read comment for special values
 	l.ignore()
 	return lexBb
 }
@@ -267,8 +265,7 @@ func lexBb(l *lexer) stateFn {
 	case r == '`':
 		return lexRawQuote
 	case couldBeUDT(r) || isNumeric(r):
-    // TODO: if it's an invalid udt it could be a string
-		l.backup()  // do not consume the pizza
+		l.backup()
 		return lexUDT
 	case isNumeric(r):
 		l.backup()
@@ -323,7 +320,7 @@ func lexSpace(l *lexer) stateFn {
 	return lexBb
 }
 
-// lexIdentifier scans an alphanumeric that isn't a udt or a number (could be a definition or bool or string)
+// scans an alphanumeric that isn't a udt or a number (could be a definition or bool or string)
 func lexIdentifier(l *lexer) stateFn {
 	log("lexIdentifier")
 Loop:
@@ -404,28 +401,6 @@ func (l *lexer) atTerminator() bool {
 	return false
 }
 
-// lexChar scans a character constant. The initial quote is already
-// scanned. Syntax checking is done by the parser.
-func lexChar(l *lexer) stateFn {
-	log("lexChar")
-
-Loop:
-	for {
-		switch l.next() {
-		case '\\':
-			if r := l.next(); r != eof && r != '\n' {
-				break
-			}
-			fallthrough
-		case eof, '\n':
-			return l.errorf("unterminated character constant")
-		case '\'':
-			break Loop
-		}
-	}
-	l.emit(itemCharConstant)
-	return lexBb
-}
 
 // scans something that could be a UDT, an invalid UDT, or a string
 // the unit could be multiple different units that start with the same letter
