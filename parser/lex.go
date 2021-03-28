@@ -422,8 +422,18 @@ func lexUDT(l *lexer) stateFn {
 
 		log("DT with no quantity")
 
-		l.scanValue()  // if there's no value it's ok
-		l.scanModifier()  // next thing could be a modifier
+		if !l.scanValue() {  // next thing could be a value or nothing
+		  log("removing unit from instances")
+		  INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			l.emit(itemError)  // modifier has an invalid value
+			return lexBb
+		}
+		if !l.scanModifier() {  // next thing could be a modifier or nothing
+			log("removing unit from instances")
+			INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			l.emit(itemError)  // modifier has an invalid value
+			return lexBb
+		}
 
 		l.emit(itemUDT)
 		return lexBb
@@ -548,8 +558,16 @@ func (l *lexer) scanNumber(udt bool) bool {
 			return false  // if there's no unit now then it's not a DT (it's a number)
 		}
 
-		l.scanValue() // if there's no value that's fine
-		l.scanModifier()  // scans until we get to an unknown modifier (start of something else)
+		if !l.scanValue() {
+			log("removing unit from instances")
+			INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			return false
+		} // if there's no value that's fine
+		if !l.scanModifier() {
+			log("removing unit from instances")
+			INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			return false
+		}  // scans until we get to an unknown modifier (start of something else)
 		return true
 
 	} else {  // for numbers only:
@@ -562,7 +580,9 @@ func (l *lexer) scanNumber(udt bool) bool {
 	}
 }
 
-func (l *lexer) scanModifier() {  // stops when the next character isn't part of the same DT
+// stops when the next character isn't part of the same DT
+// returns false if invalid
+func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
 Loop:  // loop for multiple modifier/value pairs
@@ -573,16 +593,22 @@ Loop:  // loop for multiple modifier/value pairs
 
 		if l.accept(modifiers) {
 			// it's a value
-			l.scanValue()
+			if !l.scanValue() {
+				return false
+			}
 		} else {  // invalid
-		  log(string(l.peek()) + " is not a modifier")
-			break Loop
+		  return false
+		  //log(string(l.peek()) + " is not a modifier")
+			//break Loop
 		}
 
 	}
+
+	return true
 }
 
 // values of modifiers can be numbers, quoted strings, or structures TODO JSON (structure)
+// returns false if invalid
 func (l *lexer) scanValue() bool {
 	log("scanValue")
 
@@ -606,18 +632,19 @@ Loop:
 				log("found stray backslash")
 				l.backup()  // backslash is absorbed
 			}
-		case quoted && r != quoteChar:
+		case quoted && r != quoteChar && r != '\n':
 			// absorb
-		case r == eof || r == '\n':
-			if quoted {
-				l.errorf("unterminated quoted string")
-				return false
-			}
-			fallthrough
+		//case r == '\n':
+		//	if quoted {
+		//		l.errorf("unterminated quoted string")
+		//		return false
+		//	}
+		//	fallthrough
 		default:
 			if quoted {
         if r != quoteChar {
-				  return false
+					log("Unescaped value! Invalid!")
+					return false
 				}
         break Loop
 			}
@@ -709,13 +736,15 @@ func Preview(input string) {
 		} else if item.typ == itemString {
 			colour = "92"
 		} else if item.typ == itemNumber {
-			colour = "91"
+			colour = "96"
 		} else if item.typ == itemDefinition {
 			colour = "90"
 		} else if item.typ == itemBool {
 			colour = "95"
 		} else if item.typ == itemNull {
-			colour = "96"
+			colour = "95"
+		} else if item.typ == itemError {
+			colour = "91"
 		}
 
 		fmt.Print("\033[", colour, "m", item.val, "\033[0m")
