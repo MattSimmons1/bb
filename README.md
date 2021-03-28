@@ -1,6 +1,7 @@
 
 # bb
 
+
 ### User Defined Types
 
     a = { type: apples }
@@ -32,3 +33,12 @@ These can't be used as units or modifiers
 | true  | JSON true  |
 | false | JSON false |
 | null  | JSON null  |
+
+
+### Build
+
+    go build
+
+Build Web Assembly: 
+
+    GOOS=js GOARCH=wasm go build -o bb.wasm ./wasm.go && cp bb.wasm website/bb.wasm 

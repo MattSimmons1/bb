@@ -41,50 +41,50 @@ func Convert(input string) {
 
 
 func main() {
-if err := func() (rootCmd *cobra.Command) {
-  var IsPreview bool
-  var IsDebug bool
+  if err := func() (rootCmd *cobra.Command) {
+    var IsPreview bool
+    var IsDebug bool
 
-  rootCmd = &cobra.Command{
-    Use: "bb",
-    Short: "bb command line tools",
-    Args: cobra.ArbitraryArgs,
-    Run: func(c *cobra.Command, args []string){
-      if len(args) < 1 {
-        fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
+    rootCmd = &cobra.Command{
+      Use: "bb",
+      Short: "bb command line tools",
+      Args: cobra.ArbitraryArgs,
+      Run: func(c *cobra.Command, args []string){
+        if len(args) < 1 {
+          fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
+          return
+        }
+
+        input := ""
+
+        // try to open argument as a file
+        data, err := ioutil.ReadFile(args[0])
+        if err == nil {
+          input = string(data)
+        } else {
+          input = args[0]
+        }
+
+        if IsDebug {
+          Debug(input)
+          return
+        }
+
+        if IsPreview {
+          Preview(input)
+          return
+        }
+        Convert(input)
         return
-      }
+      },
+    }
+    rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
+      "view the interpretation of the input without converting")
 
-      input := ""
+    rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
+      "show each step of the parsing process")
 
-      // try to open argument as a file
-      data, err := ioutil.ReadFile(args[0])
-      if err == nil {
-        input = string(data)
-      } else {
-        input = args[0]
-      }
-
-      if IsDebug {
-        Debug(input)
-        return
-      }
-
-      if IsPreview {
-        Preview(input)
-        return
-      }
-      Convert(input)
-      return
-    },
-  }
-  rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
-    "view the interpretation of the input without converting")
-
-  rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
-    "show each step of the parsing process")
-
-  return
+    return
   }().Execute(); err != nil {
     log.Panicln(err)
   }
@@ -96,7 +96,6 @@ To Do
 MVP
 - [x] nulls
 - [ ] import currency and SI
-- [x] don't fail for '£'
 - [ ] Only look for known modifiers
 - [ ] anything can be a modifier
   - [ ] make sure we still detect UDTs when the modifier is a string
