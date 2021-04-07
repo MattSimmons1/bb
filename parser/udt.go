@@ -11,7 +11,7 @@ type udt struct {
   Unit string
   NumericalProps map[string]float64
   StringProps map[string]string
-  //JSProps map[string]string  TODO: v0.1.1
+  ScriptProps map[string]string
   Modifiers map[rune]Modifier
 }
 
@@ -20,8 +20,9 @@ type Modifier struct {
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
-            modifiers map[rune]Modifier) *udt {
-  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, Modifiers: modifiers }
+            scriptProps map[string]string, modifiers map[rune]Modifier) *udt {
+  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps,
+               Modifiers: modifiers }
 }
 
 // take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
@@ -29,11 +30,8 @@ func NewUDTFromDefinition(definition string) {
   log("Define new UDT with " + definition)
 
   // extract just the unit
-  i := strings.Index(definition, " ")  // TODO: allow no spaces
-  if i == -1 {
-    i = strings.Index(definition, "=")
-  }
-  unit := definition[:i]
+  i := strings.Index(definition, "=")
+  unit := strings.TrimSpace(definition[:i])
   log("unit is " + unit)
   definition = definition[i:]
 
@@ -58,6 +56,7 @@ func NewUDTFromDefinition(definition string) {
 
   numericalProps := map[string]float64{}
   stringProps := map[string]string{}
+  scriptProps := map[string]string{}
   modifiers := map[rune]Modifier{}
 
   // TODO: allow commas in strings!
@@ -81,6 +80,12 @@ func NewUDTFromDefinition(definition string) {
     } else if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
       log("numerical prop: " + p[0])
       numericalProps[p[0]] = number
+    } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
+      log("script prop: " + p[0] + ", with value: " + p[1])
+      functionStart := strings.Index(p[1], "=>")
+      function := "function f(" + p[1][:functionStart] + "){ return " + p[1][functionStart+2:] + "};"
+      log(function)
+      scriptProps[p[0]] = function
     } else {
       log("string prop: " + p[0])
       // TODO: remove quotes
@@ -88,7 +93,7 @@ func NewUDTFromDefinition(definition string) {
     }
   }
 
-  t := NewUDT(unit, numericalProps, stringProps, modifiers)
+  t := NewUDT(unit, numericalProps, stringProps, scriptProps, modifiers)
 
   UDTs[unit] = t
 }
@@ -210,12 +215,9 @@ func (t *udt) Parse(s string) map[string]interface{} {
       } else {
         data[m.name] = mValue
       }
-
       pos = nextModifierIdx
     }
-
   }
-
 
   for k, v := range t.NumericalProps {
     data[k] = v
@@ -223,6 +225,10 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
   for k, v := range t.StringProps {
     data[k] = v
+  }
+
+  for k, v := range t.ScriptProps {
+    data[k] = RunScript(v, data)
   }
 
   return data
@@ -292,7 +298,8 @@ func defineBuiltInTypes(collectionName string) {
 
     for _, t := range SITypes {
      def := strings.SplitN(t, ",", 3)
-     PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] }, map[rune]Modifier{})
+     PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] },
+                           map[string]string{}, map[rune]Modifier{})
     }
   }
 
@@ -328,7 +335,8 @@ func defineBuiltInTypes(collectionName string) {
     for _, t := range currencyTypes {
      def := strings.Split(t, ",")
      for _, unit := range def[:len(def)-1] {
-       PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{ "unit": def[len(def)-1], "type": "money" }, map[rune]Modifier{})
+       PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{ "unit": def[len(def)-1], "type": "money" },
+                           map[string]string{}, map[rune]Modifier{})
      }
     }
   }
