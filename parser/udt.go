@@ -83,6 +83,7 @@ func NewUDTFromDefinition(definition string) {
     } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
       log("script prop: " + p[0] + ", with value: " + p[1])
       functionStart := strings.Index(p[1], "=>")
+      // we must re-write as a normal function because we can only run ES5 syntax 
       function := "function f(" + p[1][:functionStart] + "){ return " + p[1][functionStart+2:] + "};"
       log(function)
       scriptProps[p[0]] = function

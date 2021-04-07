@@ -100,9 +100,8 @@ MVP
 - [x] lex value for UDTs with no quantity (before lexNumber)
 - [ ] Invalid DTs
 - [ ] rows should become an array
-
 v1.0.0
 - [ ] structures/arrays
-- [ ] JS functions
+- [ ] allow single - and . as UDTs or Modifiers
 
 */
