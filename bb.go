@@ -94,14 +94,15 @@ if err := func() (rootCmd *cobra.Command) {
 
 To Do
 MVP
-- [ ] Only look for known modifiers
-- [ ] anything can be a modifier
-  - [ ] make sure we still detect UDTs when the modifier is a string
+- [x] anything can be a modifier
+  - [x] Only look for known modifiers
+  - [x] string props and modiifiers are the same
 - [x] lex value for UDTs with no quantity (before lexNumber)
-- [ ] Invalid DTs
-- [ ] rows should become an array
+- [ ] Invalid DTs should become strings? strict mode?
+- [ ] rows should become an array of arrays
 v1.0.0
+- [ ] json PDT
+- [ ] yaml PDT
 - [ ] structures/arrays
 - [ ] allow single - and . as UDTs or Modifiers
-
 */

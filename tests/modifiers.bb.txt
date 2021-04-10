@@ -1,0 +1,13 @@
+foo = { bar: fooie, b: fool, foo: confusing }
+
+20foo34bar"wooie"b4444foo  // {"fooie":"wooie","fool":4444,"quantity":20,"value":34,"confusing":1}
+
+∆ = { +: plus, @: at, ^: power }
+
+∆234
+
+∆234+23423+2342344∆34
+
+CAT = { has: has }
+
+CAThas"a hat"has"whiskers"

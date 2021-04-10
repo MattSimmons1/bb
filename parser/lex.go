@@ -475,7 +475,7 @@ func (l *lexer) scanUnit() bool {
 Loop:
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
 			log(string(r))
 			// absorb
 		default:
@@ -584,24 +584,45 @@ func (l *lexer) scanNumber(udt bool) bool {
 // returns false if invalid
 func (l *lexer) scanModifier() bool {
 	log("scanModifier")
+	modifierStart := l.pos
 
 Loop:  // loop for multiple modifier/value pairs
 	for {
-		if isSpace(l.peek()) { // end of DT
+		r := l.peek()
+		log(string(r))
+
+		if isSpace(r) { // end of DT
+		  log("found a space")
 			break Loop
 		}
 
-		if l.accept(modifiers) {
-			// it's a value
-			if !l.scanValue() {
-				return false
-			}
-		} else {  // invalid
-		  return false
-		  //log(string(l.peek()) + " is not a modifier")
-			//break Loop
+		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
+		// then check it's a known modifier - if not then stop
+		// then scan value
+		if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+				// TODO: check for dot not followed by number or dash not followed by number or dot then number
+				// check it's a known modifier
+				log("current UDT is " + INSTANCES[len(INSTANCES)-1])
+				for modifier := range UDTs[INSTANCES[len(INSTANCES)-1]].StringProps {  // get all the modifiers for the current type
+					log("is " + modifier + " == " + l.input[modifierStart:l.pos])
+				  if modifier == l.input[modifierStart:l.pos] {
+						if !l.scanValue() {
+							log("value is invalid")
+							return false
+						} else {
+							// keep going - onto the next modifier
+							//l.next()
+							modifierStart = l.pos
+							continue Loop
+						}
+					}
+				}
+			// if there are no matches - reset then stop
+			l.pos = modifierStart
+			return true
+		} else {
+			l.next()
 		}
-
 	}
 
 	return true
@@ -629,7 +650,7 @@ Loop:
 				// absorb escaped quote
 				log("found escaped quote")
 			} else {
-				log("found stray backslash")
+				log("found stray backslash")  // TODO: test this - what does this do?
 				l.backup()  // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != '\n':
@@ -695,9 +716,9 @@ Loop:
 	return lexBb
 }
 
-// TODO: = is reserved for definitons
-
+//
 func isModifierChar(r rune) bool {
+	log("is " + string(r) + " a modifier?")
 	return strings.ContainsRune(modifiers, r)
 }
 
@@ -710,9 +731,9 @@ func isSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
 }
 
-// is character valid in a unit? i.e. not a space, modifier char, or number
+// is character valid in a unit? i.e. not a space, or number
 func isUnitChar(r rune) bool {
-	return !isSpace(r) && !unicode.IsDigit(r) && !isModifierChar(r)
+	return !isSpace(r) && !unicode.IsDigit(r)
 }
 
 func isNumeric(r rune) bool {

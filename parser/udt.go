@@ -12,17 +12,12 @@ type udt struct {
   NumericalProps map[string]float64
   StringProps map[string]string
   ScriptProps map[string]string
-  Modifiers map[rune]Modifier
-}
-
-type Modifier struct {
-  name string
+  HiddenProps []string
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
-            scriptProps map[string]string, modifiers map[rune]Modifier) *udt {
-  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps,
-               Modifiers: modifiers }
+            scriptProps map[string]string) *udt {
+  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps }
 }
 
 // take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
@@ -57,7 +52,6 @@ func NewUDTFromDefinition(definition string) {
   numericalProps := map[string]float64{}
   stringProps := map[string]string{}
   scriptProps := map[string]string{}
-  modifiers := map[rune]Modifier{}
 
   // TODO: allow commas in strings!
   // split definition into props
@@ -73,11 +67,11 @@ func NewUDTFromDefinition(definition string) {
     p[1] = strings.TrimSpace(p[1])
     // TODO: remove quotes around prop names
 
-    if len(p[0]) == 1 && isModifierChar(rune(p[0][0])) {
-      // TODO: remove quotes around value
-      log("modifier prop: " + p[0] + " = " + p[1])
-      modifiers[rune(p[0][0])] = Modifier{ p[1] }
-    } else if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
+    //if len(p[0]) == 1 && isModifierChar(rune(p[0][0])) {
+      //log("modifier prop: " + p[0] + " = " + p[1])
+      //modifiers[rune(p[0][0])] = Modifier{ p[1] }
+    //} else
+    if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
       log("numerical prop: " + p[0])
       numericalProps[p[0]] = number
     } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
@@ -94,13 +88,9 @@ func NewUDTFromDefinition(definition string) {
     }
   }
 
-  t := NewUDT(unit, numericalProps, stringProps, scriptProps, modifiers)
+  t := NewUDT(unit, numericalProps, stringProps, scriptProps)
 
   UDTs[unit] = t
-}
-
-func (t *udt) AddModifier(r rune, name string) {
-  t.Modifiers[r] = Modifier{ name }
 }
 
 // parse a UDT string - we already know it's valid
@@ -130,7 +120,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
     log("this is left: " + s[pos:])
 
-    if r := rune(s[pos:pos+1][0]); isQuoteChar(r) {
+    if r := rune(s[pos]); isQuoteChar(r) {
       log("UDT has value")
       // we already know that value is valid from lexing
       if isQuoteChar(r) {
@@ -176,55 +166,148 @@ func (t *udt) Parse(s string) map[string]interface{} {
   }
 
   if pos != length {  // if there is anything remaining
+    log("looking for modifiers")
     log("this is left: " + s[pos:])
 
-    allModifiers := ""
-    for r := range t.Modifiers {
-      allModifiers += string(r)
-    }
-
-    log("looking for modifiers out of: " + allModifiers)
-
+    // bar"wooie"b"wool"
+    // scan ahead to the next non modifier character
+    modifierStart := pos
     for {
-      if pos == len(s) {
+      if pos == length {  // when we've reached the end - check for modifiers with no value - then stop
+        if pos != modifierStart {
+          log("modifier with no value")
+          m := s[modifierStart:pos]
+          t.addModifierToData(data, m, "1")
+        }
         break
       }
-      // next char must be a modifier
-      m := t.Modifiers[rune(s[pos:pos+1][0])]
-      log("found modifier: " + m.name)
-      pos++
-      // find the next modifier
-      nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
-      if nextModifierIdx < 0 {
-        log("no more modifiers")
-        nextModifierIdx = len(s)  // no more modifiers
+
+      r := rune(s[pos])
+
+      if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+
+        // TODO check for - or . modifiers
+        m := s[modifierStart:pos]
+
+        log("the modifier unit is " + m)
+        t.HiddenProps = append(t.HiddenProps, m)
+
+        for modifier := range t.StringProps {
+          if m == modifier {
+            log("modifier is called " + t.StringProps[m])
+            // loop through the value
+
+            valueStart := pos
+
+            quoted := false
+            quoteChar := rune(s[pos])
+            if quoteChar == '"' || quoteChar == '`' {
+              log("value is quoted")
+              quoted = true
+              pos++
+            }
+
+          Loop:
+            for {
+              if pos == length {
+                break Loop
+              }
+              switch r := rune(s[pos]); {
+              case isNumeric(r):
+                pos++  // absorb
+                log(string(r))
+
+              case quoted && r == '\\':
+                if rune(s[pos+1]) == quoteChar {
+                  pos+=2  // absorb escaped quote
+                  log("found escaped quote")
+                } else {
+                  log("found stray backslash")  // TODO: test this - what does this do?
+                  pos++  // backslash is absorbed
+                }
+              case quoted && r != quoteChar && r != '\n':
+                pos++  // absorb
+                log(string(r))
+
+              default:
+
+                break Loop
+              }
+            }
+            mValue := ""
+            if quoted {
+              mValue = s[valueStart+1:pos]
+              pos++  // absorb the quote char
+            } else {
+              mValue = s[valueStart:pos]
+            }
+            log("value is " + s[valueStart:pos])
+            t.addModifierToData(data, modifier, mValue)
+
+          }
+        }
+        modifierStart = pos  // onto the next modifier
+
       } else {
-        nextModifierIdx += pos
-      }
-      log(s[pos:])
-      log(s[pos:nextModifierIdx])
-      mValue := s[pos:nextModifierIdx]
-      if mValue == "" {
-        log("with no value --> 1")
-        mValue = "1"
-      } else {
-        log("with value: " + mValue)
+        log(string(r))
+        pos += 1
       }
 
-      if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
-        data[m.name] = number
-      } else {
-        data[m.name] = mValue
-      }
-      pos = nextModifierIdx
     }
+
+    //allModifiers := ""
+    //for r := range t.Modifiers {
+    // allModifiers += string(r)
+    //}
+    //
+    //log("looking for modifiers out of: " + allModifiers)
+
+    //for {
+    //  if pos == len(s) {
+    //    break
+    //  }
+    //  // next char must be a modifier
+    //  m := t.Modifiers[rune(s[pos:pos+1][0])]
+    //  log("found modifier: " + m.name)
+    //  pos++
+    //  // find the next modifier
+    //  nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
+    //  if nextModifierIdx < 0 {
+    //    log("no more modifiers")
+    //    nextModifierIdx = len(s)  // no more modifiers
+    //  } else {
+    //    nextModifierIdx += pos
+    //  }
+    //  log(s[pos:])
+    //  log(s[pos:nextModifierIdx])
+    //  mValue := s[pos:nextModifierIdx]
+    //  if mValue == "" {
+    //    log("with no value --> 1")
+    //    mValue = "1"
+    //  } else {
+    //    log("with value: " + mValue)
+    //  }
+    //
+    //  if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
+    //    data[m.name] = number
+    //  } else {
+    //    data[m.name] = mValue
+    //  }
+    //  pos = nextModifierIdx
+    //}
   }
 
   for k, v := range t.NumericalProps {
     data[k] = v
   }
 
+LoopStringProps:
   for k, v := range t.StringProps {
+    for _, prop := range t.HiddenProps {
+      if prop == k || isModifierChar(rune(prop[0])) {
+        continue LoopStringProps  // skip props that should be hidden
+      }
+    }
     data[k] = v
   }
 
@@ -233,6 +316,33 @@ func (t *udt) Parse(s string) map[string]interface{} {
   }
 
   return data
+}
+
+func (t *udt) addModifierToData(data map[string]interface{}, modifier string, value string) {
+  t.HiddenProps = append(t.HiddenProps, modifier)
+  modifierName := t.StringProps[modifier]
+  appendValue := false
+
+  if data[modifierName] != nil {
+    log("already has value")
+    appendValue = true
+    if _, ok := data[modifierName].([]interface{}); !ok {  // if the value is not already a slice
+      data[modifierName] = []interface{}{ data[modifierName] }  // convert to slice
+    }
+  }
+  if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
+    if appendValue {
+      data[modifierName] = append(data[modifierName].([]interface{}), number)
+    } else {
+      data[modifierName] = number
+    }
+  } else {
+    if appendValue {
+      data[modifierName] = append(data[modifierName].([]interface{}), value)
+    } else {
+      data[modifierName] = value
+    }
+  }
 }
 
 var UDTs = map[string]*udt{}  // stores user defined types
@@ -300,7 +410,7 @@ func defineBuiltInTypes(collectionName string) {
     for _, t := range SITypes {
      def := strings.SplitN(t, ",", 3)
      PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] },
-                           map[string]string{}, map[rune]Modifier{})
+                           map[string]string{})
     }
   }
 
@@ -337,7 +447,7 @@ func defineBuiltInTypes(collectionName string) {
      def := strings.Split(t, ",")
      for _, unit := range def[:len(def)-1] {
        PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{ "unit": def[len(def)-1], "type": "money" },
-                           map[string]string{}, map[rune]Modifier{})
+                           map[string]string{})
      }
     }
   }
