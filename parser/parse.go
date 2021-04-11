@@ -55,22 +55,24 @@ func Parse(input string) []interface{} {
 }
 
 func Debug(input string) {
-	verbose = true
 
 	l := lex(input)
 
 	for item := range l.items {
+		typeName := ""
 		value := ""
 		jsonString := ""
-		if item.typ == itemSpace {
-			value = "[space]"
-		} else if item.typ == itemTab {
-			value = "[tab]"
-		} else if item.typ == itemNewline {
-			value = "[newline]"
-		} else if item.typ == itemEOF {
-			value = "[EOF]"
-		} else if item.typ == itemUDT {
+		switch item.typ {
+		case itemSpace:
+			typeName = " space"
+		case itemTab:
+			typeName = " tab"
+		case itemNewline:
+			typeName = " newline"
+		case itemEOF:
+			typeName = " EOF"
+		case itemUDT:
+			typeName = "\nUDT"
 			value = item.val
 			data := ParseUDT(item.val)
 			j, err := json.Marshal(data)
@@ -78,10 +80,34 @@ func Debug(input string) {
 				panic(err)
 			}
 			jsonString = string(j)
-		} else {
+		case itemString:
 			value = item.val
+			typeName = "\nString"
+		case itemNumber:
+			value = item.val
+			typeName = "\nNumber"
+		case itemDefinition:
+			value = item.val
+			typeName = "\nDefinition"
+		case itemBool:
+			value = item.val
+			typeName = "\nBool"
+		case itemNull:
+			value = item.val
+			typeName = "\nNull"
+		default:
+			value = item.val
+			typeName = "\nvalue"
 		}
-		fmt.Print("\n  ", itemNames[item.typ], " ",  "\033[92m", value, "\033[0m \033[91m", jsonString, "\033[0m")
+
+		if value != "" {
+		  fmt.Print(typeName, " \033[92m", value, "\033[0m")
+		} else {
+		  fmt.Print("\033[90m" + typeName, "\033[0m")
+		}
+		if jsonString != "" {
+			fmt.Print(" \033[91m", jsonString, "\033[0m")
+		}
 	}
 
 	fmt.Print("\n\n")

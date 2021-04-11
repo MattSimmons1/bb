@@ -40,16 +40,15 @@ $ bb my_data.bb.txt
 
 | bb  | Interpretation  | Explanation  |
 |-----|-----------------|--------------| 
-| O = { type: Blood Oxygen Level }<br>**O**99 **O**98 **O**85 | [{}]   | Values after the unit become the 'value' property |
 | ∆ = { food: Pizza, @: price, total: d => d.price * d.quantity }<br>34∆@19.50 | [{ "food": "Pizza", "quantity": 34, "price": 19.5, "total": 663 }] | '@' is defined as a modifier. The value following '@' will be the price. | 
 
 
 ### Pre-Defined Types
 
-| Unit  | Meaning  |
-|-------|----------|
-| ·     | null     |
-
+| Unit  | Example | Meaning  |
+|-------|---------|----------|
+| json  | ```json`{"key": "value", "foo", [1, 2, 3]}` ``` => `{"key": "value", "foo", [1, 2, 3]}` | The value is parsed as JSON |
+| ·     | `·` => `null`   | shorthand for null     |
 
 ### Reserved Characters
 

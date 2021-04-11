@@ -98,6 +98,10 @@ type lexer struct {
 
 var verbose = false
 
+func SetVerbose() {
+	verbose = true
+}
+
 func log(message string) {
 	if verbose {
 		if message == "lexBb" {
@@ -240,7 +244,7 @@ func lexInlineComment(l *lexer) stateFn {
 	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
 	splitComment := strings.SplitN(cleanedComment, " ", 2)
 	if splitComment[0] == "import" && len(splitComment) > 1 {
-		defineBuiltInTypes(strings.ToLower(splitComment[1]))
+		defineImportedTypes(strings.ToLower(splitComment[1]))
 	}
 	l.pos += Pos(i)
 	l.ignore()
@@ -586,7 +590,6 @@ func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
 	udt := INSTANCES[len(INSTANCES)-1]
-	log("current UDT is " + udt)
 	rawModifiers := map[string]string{}
 	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise map to store modifiers
 
@@ -596,11 +599,6 @@ func (l *lexer) scanModifier() bool {
 	for {
 		r := l.peek()
 		log(string(r))
-
-		//if isSpace(r) { // end of DT
-		//  log("found a space")
-		//	break Loop
-		//}
 
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
@@ -612,8 +610,7 @@ func (l *lexer) scanModifier() bool {
 			m := l.input[modifierStart:l.pos]
 			backtrackCharacters := 0
 
-		  LoopBacktrack:
-			for {
+		  LoopBacktrack: for {  // loop for multiple lengths of modifier, i.e. #>? then #> then #
 
 				if len(m) == backtrackCharacters {
 					log("nothing matches " + m)
@@ -622,7 +619,6 @@ func (l *lexer) scanModifier() bool {
 					m2 := m[:len(m)-backtrackCharacters]
 
 					for modifier := range UDTs[udt].StringProps { // get all the modifiers for the current type
-						log("is " + modifier + " == " + m2)
 						if modifier == m2 {
 							l.pos = l.pos - Pos(backtrackCharacters)
 							log("modifier is: \033[92m" + m2 + "\033[0m")
@@ -630,6 +626,7 @@ func (l *lexer) scanModifier() bool {
 								log("value is invalid")
 								return false
 							} else {
+								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
 								rawModifiers[m2] = l.input[modifierStart+Pos(len(m2)):l.pos]  // store the modifier and value we've found
 								// keep going - onto the next modifier
 								//l.next()

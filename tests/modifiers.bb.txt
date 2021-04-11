@@ -4,5 +4,9 @@ foo = { bar: fooie, b: fool }
 ∆ = { +: plus, @: at, ^: power, >: comment }
 ∆234+>"wow"
 
+json`{"valid": "json"}`
+json`{invalid`
+json23
+
 //CAT = { has: has }
 //CAThas"a hat"has"whiskers"

@@ -41,9 +41,12 @@ func Convert(input string) {
 
 
 func main() {
+  parser.DefineBuiltInTypes()
+
 if err := func() (rootCmd *cobra.Command) {
   var IsPreview bool
   var IsDebug bool
+  var IsVerbose bool
 
   rootCmd = &cobra.Command{
     Use: "bb",
@@ -65,6 +68,10 @@ if err := func() (rootCmd *cobra.Command) {
         input = args[0]
       }
 
+      if IsVerbose {
+        parser.SetVerbose()
+      }
+
       if IsDebug {
         Debug(input)
         return
@@ -78,6 +85,9 @@ if err := func() (rootCmd *cobra.Command) {
       return
     },
   }
+  rootCmd.PersistentFlags().BoolVarP(&IsVerbose, "verbose", "v", false,
+    "show detailed logs from the bb lexer and parser")
+
   rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
     "view the interpretation of the input without converting")
 
@@ -95,9 +105,6 @@ if err := func() (rootCmd *cobra.Command) {
 To Do
 MVP
 - [x] anything can be a modifier
-  - [x] Only look for known modifiers
-  - [x] string props and modiifiers are the same
-- [x] lex value for UDTs with no quantity (before lexNumber)
 - [ ] Invalid DTs should become strings? strict mode?
 - [ ] rows should become an array of arrays
 v1.0.0
@@ -105,4 +112,5 @@ v1.0.0
 - [ ] yaml PDT
 - [ ] structures/arrays
 - [ ] allow single - and . as UDTs or Modifiers
+- [ ] safe mode / strict mode
 */

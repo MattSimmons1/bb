@@ -2,22 +2,25 @@
 package parser
 
 import (
+  "encoding/json"
   "strconv"
   "strings"
   "unicode"
 )
 
 type udt struct {
-  Unit string
+  Unit           string
   NumericalProps map[string]float64
-  StringProps map[string]string
-  ScriptProps map[string]string
-  HiddenProps []string
+  StringProps    map[string]string
+  ScriptProps    map[string]string
+  HiddenProps    []string
+  isSpecial      bool  // has special properties that affect parsing (for pre-defined types)
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
             scriptProps map[string]string) *udt {
-  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps }
+  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps,
+               isSpecial: false }
 }
 
 // take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
@@ -67,10 +70,6 @@ func NewUDTFromDefinition(definition string) {
     p[1] = strings.TrimSpace(p[1])
     // TODO: remove quotes around prop names
 
-    //if len(p[0]) == 1 && isModifierChar(rune(p[0][0])) {
-      //log("modifier prop: " + p[0] + " = " + p[1])
-      //modifiers[rune(p[0][0])] = Modifier{ p[1] }
-    //} else
     if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
       log("numerical prop: " + p[0])
       numericalProps[p[0]] = number
@@ -165,113 +164,6 @@ func (t *udt) Parse(s string) map[string]interface{} {
     t.addModifierToData(data, modifier, rawValue)
   }
 
-  //if pos != length {  // if there is anything remaining
-  //  log("looking for modifiers")
-  //  log("this is left: " + s[pos:])
-  //
-  //  // bar"wooie"b"wool"
-  //  // scan ahead to the next non modifier character
-  //  modifierStart := pos
-  //  for {
-  //    if pos == length { // when we've reached the end - check for modifiers with no value - then stop
-  //      if pos != modifierStart {
-  //        log("modifier with no value")
-  //        m := s[modifierStart:pos]
-  //        t.addModifierToData(data, m, "1")
-  //      }
-  //      break
-  //    }
-  //
-  //    r := rune(s[pos])
-  //
-  //    if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
-  //
-  //      // TODO check for - or . modifiers
-  //      m := s[modifierStart:pos]
-  //      backtrackCharacters := 0
-  //
-  //      backtrackLoop: for {
-  //        if len(m) == backtrackCharacters {
-  //          break backtrackLoop
-  //        }
-  //
-  //        m2 := m[:len(m)-backtrackCharacters]
-  //
-  //        log("the modifier unit could be " + m2)
-  //
-  //        if m == "" {
-  //          panic("Parsing Error") // TODO
-  //        }
-  //
-  //        for modifier := range t.StringProps {
-  //          if m2 == modifier {
-  //            log("modifier is: \033[92m" + m2 + "\033[0m")
-  //            //pos -= backtrackCharacters
-  //
-  //            // loop through the value
-  //            valueStart := pos
-  //
-  //            quoted := false
-  //            quoteChar := rune(s[pos])
-  //            if quoteChar == '"' || quoteChar == '`' {
-  //              log("value is quoted")
-  //              quoted = true
-  //              pos++
-  //            }
-  //
-  //          Loop:
-  //            for {
-  //              if pos == length {
-  //                break Loop
-  //              }
-  //              switch r := rune(s[pos]); {
-  //              case isNumeric(r):
-  //                pos++ // absorb
-  //                log(string(r))
-  //
-  //              case quoted && r == '\\':
-  //                if rune(s[pos+1]) == quoteChar {
-  //                  pos += 2 // absorb escaped quote
-  //                  log("found escaped quote")
-  //                } else {
-  //                  pos++  // backslash is absorbed
-  //                }
-  //              case quoted && r != quoteChar && r != '\n':
-  //                pos++ // absorb
-  //                log(string(r))
-  //
-  //              default:
-  //                break Loop
-  //              }
-  //            }
-  //            mValue := ""
-  //            if quoted {
-  //              mValue = s[valueStart+1 : pos]
-  //              pos++ // absorb the quote char
-  //            } else {
-  //              mValue = s[valueStart:pos]
-  //            }
-  //            log("value is " + s[valueStart:pos])
-  //            t.addModifierToData(data, modifier, mValue)
-  //
-  //          }
-  //        }
-  //        backtrackCharacters++
-  //
-  //      }
-  //      modifierStart = pos // onto the next modifier
-  //      // if no modifier was found - it's an error
-  //      //panic("no modifier matched - THIS SHOULD NOT HAPPEN!!!")
-  //
-  //    } else {
-  //      log(string(r))
-  //      pos += 1
-  //    }
-  //
-  //  }
-  //
-  //}
-
   for k, v := range t.NumericalProps {
     data[k] = v
   }
@@ -340,7 +232,7 @@ var MODIFIER_INSTANCES []*map[string]string  // stores every modifier and raw va
 var instanceIdx int = 0  // the current index of INSTANCES we're parsing
 
 // identify the type and parse
-func ParseUDT(input string) map[string]interface{} {
+func ParseUDT(input string) interface{} {
   unit := INSTANCES[instanceIdx]
 
   f := func () {
@@ -352,10 +244,36 @@ func ParseUDT(input string) map[string]interface{} {
   if t == nil {
     t = PDTs[unit]
   }
-  return t.Parse(input)
+  if t.isSpecial && unit == "json" {  // special type - convert to pure json
+    data := t.Parse(input)
+    if data["value"] != nil {
+      var valueData interface{}
+      if _, ok := data["value"].(string); !ok {
+        return data["value"]  // don't need to parse non-strings
+      }
+      err := json.Unmarshal([]byte(data["value"].(string)), &valueData)
+      if err != nil {
+        data["value"] = nil
+        return data
+      }
+      return valueData
+    } else {
+      data["value"] = nil
+      return data
+    }
+
+  } else {
+    return t.Parse(input)
+  }
 }
 
-func defineBuiltInTypes(collectionName string) {
+func DefineBuiltInTypes() {  // these are handled differently
+  PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{})
+  PDTs["json"].isSpecial = true
+  //PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{}) TODO
+}
+
+func defineImportedTypes(collectionName string) {
 
   if collectionName == "si" {
     log("Importing SI Units")
@@ -444,7 +362,6 @@ func defineBuiltInTypes(collectionName string) {
      }
     }
   }
-
 }
 
 // return true if a rune could be the start of a udt - slightly faster than checking the whole thing
