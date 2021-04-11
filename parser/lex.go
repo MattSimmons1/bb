@@ -584,40 +584,67 @@ func (l *lexer) scanNumber(udt bool) bool {
 // returns false if invalid
 func (l *lexer) scanModifier() bool {
 	log("scanModifier")
+
+	udt := INSTANCES[len(INSTANCES)-1]
+	log("current UDT is " + udt)
+	rawModifiers := map[string]string{}
+	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise map to store modifiers
+
 	modifierStart := l.pos
 
-Loop:  // loop for multiple modifier/value pairs
+  Loop:  // loop for multiple modifier/value pairs
 	for {
 		r := l.peek()
 		log(string(r))
 
-		if isSpace(r) { // end of DT
-		  log("found a space")
-			break Loop
-		}
+		//if isSpace(r) { // end of DT
+		//  log("found a space")
+		//	break Loop
+		//}
 
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
 		// then scan value
 		if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
-				// TODO: check for dot not followed by number or dash not followed by number or dot then number
-				// check it's a known modifier
-				log("current UDT is " + INSTANCES[len(INSTANCES)-1])
-				for modifier := range UDTs[INSTANCES[len(INSTANCES)-1]].StringProps {  // get all the modifiers for the current type
-					log("is " + modifier + " == " + l.input[modifierStart:l.pos])
-				  if modifier == l.input[modifierStart:l.pos] {
-						if !l.scanValue() {
-							log("value is invalid")
-							return false
-						} else {
-							// keep going - onto the next modifier
-							//l.next()
-							modifierStart = l.pos
-							continue Loop
+			// TODO: check for dot not followed by number or dash not followed by number or dot then number
+			// check it's a known modifier
+
+			m := l.input[modifierStart:l.pos]
+			backtrackCharacters := 0
+
+		  LoopBacktrack:
+			for {
+
+				if len(m) == backtrackCharacters {
+					log("nothing matches " + m)
+					break LoopBacktrack  // if we've already looked for modifiers of length 1 then give up
+				} else {
+					m2 := m[:len(m)-backtrackCharacters]
+
+					for modifier := range UDTs[udt].StringProps { // get all the modifiers for the current type
+						log("is " + modifier + " == " + m2)
+						if modifier == m2 {
+							l.pos = l.pos - Pos(backtrackCharacters)
+							log("modifier is: \033[92m" + m2 + "\033[0m")
+							if !l.scanValue() {
+								log("value is invalid")
+								return false
+							} else {
+								rawModifiers[m2] = l.input[modifierStart+Pos(len(m2)):l.pos]  // store the modifier and value we've found
+								// keep going - onto the next modifier
+								//l.next()
+								modifierStart = l.pos
+								continue Loop
+							}
 						}
 					}
+					log("Couldn't find a match for " + m2)
+					// if there are no matches - look for a shorter modifier
+					backtrackCharacters += 1
 				}
-			// if there are no matches - reset then stop
+			}
+
+			// if there are still no matches - reset then stop (assume the next character is part of something else)
 			l.pos = modifierStart
 			return true
 		} else {

@@ -84,7 +84,7 @@ func NewUDTFromDefinition(definition string) {
     } else {
       log("string prop: " + p[0])
       // TODO: remove quotes
-      stringProps[p[0]] = p[1]
+      stringProps[p[0]] = removeQuotes(p[1])
     }
   }
 
@@ -118,8 +118,6 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
   if pos != length { // if there is anything remaining
 
-    log("this is left: " + s[pos:])
-
     if r := rune(s[pos]); isQuoteChar(r) {
       log("UDT has value")
       // we already know that value is valid from lexing
@@ -151,7 +149,6 @@ func (t *udt) Parse(s string) map[string]interface{} {
         if pos == length || !isNumeric(rune(s[pos])) {
           break
         } else {
-          log("this is left: " + s[pos:])
           pos++
         }
       }
@@ -160,153 +157,133 @@ func (t *udt) Parse(s string) map[string]interface{} {
         data["value"] = s[valueIdx:pos]  // invalid values are kept as string, e.g. 1.0.0
       } else {
         data["value"] = number
-
       }
     }
   }
 
-  if pos != length {  // if there is anything remaining
-    log("looking for modifiers")
-    log("this is left: " + s[pos:])
-
-    // bar"wooie"b"wool"
-    // scan ahead to the next non modifier character
-    modifierStart := pos
-    for {
-      if pos == length {  // when we've reached the end - check for modifiers with no value - then stop
-        if pos != modifierStart {
-          log("modifier with no value")
-          m := s[modifierStart:pos]
-          t.addModifierToData(data, m, "1")
-        }
-        break
-      }
-
-      r := rune(s[pos])
-
-      if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
-
-        // TODO check for - or . modifiers
-        m := s[modifierStart:pos]
-
-        log("the modifier unit is " + m)
-        t.HiddenProps = append(t.HiddenProps, m)
-
-        for modifier := range t.StringProps {
-          if m == modifier {
-            log("modifier is called " + t.StringProps[m])
-            // loop through the value
-
-            valueStart := pos
-
-            quoted := false
-            quoteChar := rune(s[pos])
-            if quoteChar == '"' || quoteChar == '`' {
-              log("value is quoted")
-              quoted = true
-              pos++
-            }
-
-          Loop:
-            for {
-              if pos == length {
-                break Loop
-              }
-              switch r := rune(s[pos]); {
-              case isNumeric(r):
-                pos++  // absorb
-                log(string(r))
-
-              case quoted && r == '\\':
-                if rune(s[pos+1]) == quoteChar {
-                  pos+=2  // absorb escaped quote
-                  log("found escaped quote")
-                } else {
-                  log("found stray backslash")  // TODO: test this - what does this do?
-                  pos++  // backslash is absorbed
-                }
-              case quoted && r != quoteChar && r != '\n':
-                pos++  // absorb
-                log(string(r))
-
-              default:
-
-                break Loop
-              }
-            }
-            mValue := ""
-            if quoted {
-              mValue = s[valueStart+1:pos]
-              pos++  // absorb the quote char
-            } else {
-              mValue = s[valueStart:pos]
-            }
-            log("value is " + s[valueStart:pos])
-            t.addModifierToData(data, modifier, mValue)
-
-          }
-        }
-        modifierStart = pos  // onto the next modifier
-
-      } else {
-        log(string(r))
-        pos += 1
-      }
-
-    }
-
-    //allModifiers := ""
-    //for r := range t.Modifiers {
-    // allModifiers += string(r)
-    //}
-    //
-    //log("looking for modifiers out of: " + allModifiers)
-
-    //for {
-    //  if pos == len(s) {
-    //    break
-    //  }
-    //  // next char must be a modifier
-    //  m := t.Modifiers[rune(s[pos:pos+1][0])]
-    //  log("found modifier: " + m.name)
-    //  pos++
-    //  // find the next modifier
-    //  nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
-    //  if nextModifierIdx < 0 {
-    //    log("no more modifiers")
-    //    nextModifierIdx = len(s)  // no more modifiers
-    //  } else {
-    //    nextModifierIdx += pos
-    //  }
-    //  log(s[pos:])
-    //  log(s[pos:nextModifierIdx])
-    //  mValue := s[pos:nextModifierIdx]
-    //  if mValue == "" {
-    //    log("with no value --> 1")
-    //    mValue = "1"
-    //  } else {
-    //    log("with value: " + mValue)
-    //  }
-    //
-    //  if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
-    //    data[m.name] = number
-    //  } else {
-    //    data[m.name] = mValue
-    //  }
-    //  pos = nextModifierIdx
-    //}
+  for modifier, rawValue := range *MODIFIER_INSTANCES[instanceIdx] {
+    t.addModifierToData(data, modifier, rawValue)
   }
+
+  //if pos != length {  // if there is anything remaining
+  //  log("looking for modifiers")
+  //  log("this is left: " + s[pos:])
+  //
+  //  // bar"wooie"b"wool"
+  //  // scan ahead to the next non modifier character
+  //  modifierStart := pos
+  //  for {
+  //    if pos == length { // when we've reached the end - check for modifiers with no value - then stop
+  //      if pos != modifierStart {
+  //        log("modifier with no value")
+  //        m := s[modifierStart:pos]
+  //        t.addModifierToData(data, m, "1")
+  //      }
+  //      break
+  //    }
+  //
+  //    r := rune(s[pos])
+  //
+  //    if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+  //
+  //      // TODO check for - or . modifiers
+  //      m := s[modifierStart:pos]
+  //      backtrackCharacters := 0
+  //
+  //      backtrackLoop: for {
+  //        if len(m) == backtrackCharacters {
+  //          break backtrackLoop
+  //        }
+  //
+  //        m2 := m[:len(m)-backtrackCharacters]
+  //
+  //        log("the modifier unit could be " + m2)
+  //
+  //        if m == "" {
+  //          panic("Parsing Error") // TODO
+  //        }
+  //
+  //        for modifier := range t.StringProps {
+  //          if m2 == modifier {
+  //            log("modifier is: \033[92m" + m2 + "\033[0m")
+  //            //pos -= backtrackCharacters
+  //
+  //            // loop through the value
+  //            valueStart := pos
+  //
+  //            quoted := false
+  //            quoteChar := rune(s[pos])
+  //            if quoteChar == '"' || quoteChar == '`' {
+  //              log("value is quoted")
+  //              quoted = true
+  //              pos++
+  //            }
+  //
+  //          Loop:
+  //            for {
+  //              if pos == length {
+  //                break Loop
+  //              }
+  //              switch r := rune(s[pos]); {
+  //              case isNumeric(r):
+  //                pos++ // absorb
+  //                log(string(r))
+  //
+  //              case quoted && r == '\\':
+  //                if rune(s[pos+1]) == quoteChar {
+  //                  pos += 2 // absorb escaped quote
+  //                  log("found escaped quote")
+  //                } else {
+  //                  pos++  // backslash is absorbed
+  //                }
+  //              case quoted && r != quoteChar && r != '\n':
+  //                pos++ // absorb
+  //                log(string(r))
+  //
+  //              default:
+  //                break Loop
+  //              }
+  //            }
+  //            mValue := ""
+  //            if quoted {
+  //              mValue = s[valueStart+1 : pos]
+  //              pos++ // absorb the quote char
+  //            } else {
+  //              mValue = s[valueStart:pos]
+  //            }
+  //            log("value is " + s[valueStart:pos])
+  //            t.addModifierToData(data, modifier, mValue)
+  //
+  //          }
+  //        }
+  //        backtrackCharacters++
+  //
+  //      }
+  //      modifierStart = pos // onto the next modifier
+  //      // if no modifier was found - it's an error
+  //      //panic("no modifier matched - THIS SHOULD NOT HAPPEN!!!")
+  //
+  //    } else {
+  //      log(string(r))
+  //      pos += 1
+  //    }
+  //
+  //  }
+  //
+  //}
 
   for k, v := range t.NumericalProps {
     data[k] = v
   }
 
-LoopStringProps:
-  for k, v := range t.StringProps {
+  LoopStringProps: for k, v := range t.StringProps {
     for _, prop := range t.HiddenProps {
-      if prop == k || isModifierChar(rune(prop[0])) {
+      if prop == k {
         continue LoopStringProps  // skip props that should be hidden
       }
+    }
+    if isModifierChar(rune(k[0])) {
+      continue LoopStringProps  // skip props that start with standard modifier chars TODO: or give them null value?
     }
     data[k] = v
   }
@@ -323,11 +300,21 @@ func (t *udt) addModifierToData(data map[string]interface{}, modifier string, va
   modifierName := t.StringProps[modifier]
   appendValue := false
 
+  if value == "" {
+    value = "1"
+  }
+
+  // remove quotes
+  value = removeQuotes(value)
+
   if data[modifierName] != nil {
-    log("already has value")
-    appendValue = true
-    if _, ok := data[modifierName].([]interface{}); !ok {  // if the value is not already a slice
-      data[modifierName] = []interface{}{ data[modifierName] }  // convert to slice
+    if data[modifierName] == "" {  // TODO: why does this happen?
+      // don't append
+    } else {
+      appendValue = true
+      if _, ok := data[modifierName].([]interface{}); !ok {  // if the value is not already a slice
+        data[modifierName] = []interface{}{ data[modifierName] }  // convert to slice
+      }
     }
   }
   if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
@@ -349,12 +336,18 @@ var UDTs = map[string]*udt{}  // stores user defined types
 var PDTs = map[string]*udt{}  // stores pre-defined types
 
 var INSTANCES []string  // stores the unit of every UDT we find
+var MODIFIER_INSTANCES []*map[string]string  // stores every modifier and raw value we find
 var instanceIdx int = 0  // the current index of INSTANCES we're parsing
 
 // identify the type and parse
 func ParseUDT(input string) map[string]interface{} {
   unit := INSTANCES[instanceIdx]
-  instanceIdx++
+
+  f := func () {
+    instanceIdx++
+  }
+  defer f()
+
   t := UDTs[unit]
   if t == nil {
     t = PDTs[unit]

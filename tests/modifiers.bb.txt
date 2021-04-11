@@ -1,13 +1,8 @@
-foo = { bar: fooie, b: fool, foo: confusing }
+foo = { bar: fooie, b: fool }
+20foo34bar"wooie"b4444b324foo  // {"fooie":"wooie","fool":4444,"quantity":20,"value":34}
 
-20foo34bar"wooie"b4444foo  // {"fooie":"wooie","fool":4444,"quantity":20,"value":34,"confusing":1}
+∆ = { +: plus, @: at, ^: power, >: comment }
+∆234+>"wow"
 
-∆ = { +: plus, @: at, ^: power }
-
-∆234
-
-∆234+23423+2342344∆34
-
-CAT = { has: has }
-
-CAThas"a hat"has"whiskers"
+//CAT = { has: has }
+//CAThas"a hat"has"whiskers"
