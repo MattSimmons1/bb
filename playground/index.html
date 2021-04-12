@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>bb</title>
+</head>
+
+<style>
+	body {
+		margin: 0;
+		background: #e3e3ec;
+	}
+	#bbInput, #jsonOutput {
+		color: white;
+    background: #111214;
+		border: none;
+		border-radius: 10px;
+		padding: 20px;
+	}
+	.output {
+		width: 500px;
+	}
+</style>
+
+<p>
+
+	<div><textarea id="bbInput" name="bbInput" rows="20" cols="80" onchange="convert();">
+// import si
+50kg 20kg 12.5kg</textarea></div>
+
+	<div class="output"><pre id="jsonOutput"></pre></div>
+
+
+	<script src="js/wasm_exec.js"></script>
+	<script>
+		if (!WebAssembly.instantiateStreaming) { // polyfill
+			WebAssembly.instantiateStreaming = async (resp, importObject) => {
+				const source = await (await resp).arrayBuffer();
+				return await WebAssembly.instantiate(source, importObject);
+			};
+		}
+
+		wasm = {};  // create a global object that I can attach functions to from go
+
+		const go = new Go();
+		let mod, inst;
+		WebAssembly.instantiateStreaming(fetch("bb.wasm"), go.importObject).then((result) => {
+			mod = result.module;
+			inst = result.instance;
+		}).catch((err) => {
+			console.error(err);
+		}).then(init);
+
+		async function init() {
+			await go.run(inst);  // this runs the init() function of bb.go
+
+			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
+		}
+
+
+	//
+	// playground
+	//
+  function convert() {
+
+		const input = document.getElementById("bbInput").value;
+		console.log(input);
+		let output = wasm.bb(input);
+		console.log(output)
+
+		if (typeof(output) === "undefined") {
+			const go = new Go();
+			let mod, inst;
+			WebAssembly.instantiateStreaming(fetch("bb.wasm"), go.importObject).then((result) => {
+				mod = result.module;
+				inst = result.instance;
+			}).catch((err) => {
+				console.error(err);
+			}).then(init);
+			output = "ERROR";
+		}
+
+		document.getElementById("jsonOutput").innerText = JSON.stringify(output, null, 4);
+
+	}
+
+  document.getElementById("bbInput").oninput=convert;
+
+</script>
+</body>
+
+</html>

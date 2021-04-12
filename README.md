@@ -102,5 +102,5 @@ $500 £10 50GBP 0.12BTC
 
 Build Web Assembly: 
 
-    GOOS=js GOARCH=wasm go build -o bb.wasm ./wasm.go && cp bb.wasm website/bb.wasm 
+    GOOS=js GOARCH=wasm go build -o bb.wasm ./wasm.go && cp bb.wasm playground/bb.wasm 
 
