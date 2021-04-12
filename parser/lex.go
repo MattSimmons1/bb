@@ -674,7 +674,7 @@ Loop:
 				// absorb escaped quote
 				log("found escaped quote")
 			} else {
-				log("found stray backslash")  // TODO: test this - what does this do?
+				log("found stray backslash")
 				l.backup()  // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != '\n':
