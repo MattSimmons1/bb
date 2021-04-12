@@ -41,6 +41,7 @@ func Convert(input string) {
 
 
 func main() {
+<<<<<<< HEAD
   if err := func() (rootCmd *cobra.Command) {
     var IsPreview bool
     var IsDebug bool
@@ -75,6 +76,22 @@ func main() {
           return
         }
         Convert(input)
+=======
+  parser.DefineBuiltInTypes()
+
+if err := func() (rootCmd *cobra.Command) {
+  var IsPreview bool
+  var IsDebug bool
+  var IsVerbose bool
+
+  rootCmd = &cobra.Command{
+    Use: "bb",
+    Short: "bb command line tools",
+    Args: cobra.ArbitraryArgs,
+    Run: func(c *cobra.Command, args []string){
+      if len(args) < 1 {
+        fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
+>>>>>>> main
         return
       },
     }
@@ -84,7 +101,45 @@ func main() {
     rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
       "show each step of the parsing process")
 
+<<<<<<< HEAD
     return
+=======
+      // try to open argument as a file
+      data, err := ioutil.ReadFile(args[0])
+      if err == nil {
+        input = string(data)
+      } else {
+        input = args[0]
+      }
+
+      if IsVerbose {
+        parser.SetVerbose()
+      }
+
+      if IsDebug {
+        Debug(input)
+        return
+      }
+
+      if IsPreview {
+        Preview(input)
+        return
+      }
+      Convert(input)
+      return
+    },
+  }
+  rootCmd.PersistentFlags().BoolVarP(&IsVerbose, "verbose", "v", false,
+    "show detailed logs from the bb lexer and parser")
+
+  rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
+    "view the interpretation of the input without converting")
+
+  rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
+    "show each step of the parsing process")
+
+  return
+>>>>>>> main
   }().Execute(); err != nil {
     log.Panicln(err)
   }
@@ -94,6 +149,7 @@ func main() {
 
 To Do
 MVP
+<<<<<<< HEAD
 - [x] nulls
 - [ ] import currency and SI
 - [ ] Only look for known modifiers
@@ -103,8 +159,15 @@ MVP
 - [ ] Invalid DTs
 - [ ] rows should become an array
 
+=======
+- [x] anything can be a modifier
+- [ ] Invalid DTs should become strings? strict mode?
+- [ ] rows should become an array of arrays
+>>>>>>> main
 v1.0.0
+- [ ] json PDT
+- [ ] yaml PDT
 - [ ] structures/arrays
-- [ ] JS functions
-
+- [ ] allow single - and . as UDTs or Modifiers
+- [ ] safe mode / strict mode
 */

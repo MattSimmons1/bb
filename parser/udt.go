@@ -2,26 +2,25 @@
 package parser
 
 import (
+  "encoding/json"
   "strconv"
   "strings"
   "unicode"
 )
 
 type udt struct {
-  Unit string
+  Unit           string
   NumericalProps map[string]float64
-  StringProps map[string]string
-  //JSProps map[string]string  TODO: v0.1.1
-  Modifiers map[rune]Modifier
-}
-
-type Modifier struct {
-  name string
+  StringProps    map[string]string
+  ScriptProps    map[string]string
+  HiddenProps    []string
+  isSpecial      bool  // has special properties that affect parsing (for pre-defined types)
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
-            modifiers map[rune]Modifier) *udt {
-  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, Modifiers: modifiers }
+            scriptProps map[string]string) *udt {
+  return &udt{ Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps,
+               isSpecial: false }
 }
 
 // take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
@@ -29,11 +28,8 @@ func NewUDTFromDefinition(definition string) {
   log("Define new UDT with " + definition)
 
   // extract just the unit
-  i := strings.Index(definition, " ")  // TODO: allow no spaces
-  if i == -1 {
-    i = strings.Index(definition, "=")
-  }
-  unit := definition[:i]
+  i := strings.Index(definition, "=")
+  unit := strings.TrimSpace(definition[:i])
   log("unit is " + unit)
   definition = definition[i:]
 
@@ -58,7 +54,7 @@ func NewUDTFromDefinition(definition string) {
 
   numericalProps := map[string]float64{}
   stringProps := map[string]string{}
-  modifiers := map[rune]Modifier{}
+  scriptProps := map[string]string{}
 
   // TODO: allow commas in strings!
   // split definition into props
@@ -74,27 +70,26 @@ func NewUDTFromDefinition(definition string) {
     p[1] = strings.TrimSpace(p[1])
     // TODO: remove quotes around prop names
 
-    if len(p[0]) == 1 && isModifierChar(rune(p[0][0])) {
-      // TODO: remove quotes around value
-      log("modifier prop: " + p[0] + " = " + p[1])
-      modifiers[rune(p[0][0])] = Modifier{ p[1] }
-    } else if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
+    if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
       log("numerical prop: " + p[0])
       numericalProps[p[0]] = number
+    } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
+      log("script prop: " + p[0] + ", with value: " + p[1])
+      functionStart := strings.Index(p[1], "=>")
+      // we must re-write as a normal function because we can only run ES5 syntax 
+      function := "function f(" + p[1][:functionStart] + "){ return " + p[1][functionStart+2:] + "};"
+      log(function)
+      scriptProps[p[0]] = function
     } else {
       log("string prop: " + p[0])
       // TODO: remove quotes
-      stringProps[p[0]] = p[1]
+      stringProps[p[0]] = removeQuotes(p[1])
     }
   }
 
-  t := NewUDT(unit, numericalProps, stringProps, modifiers)
+  t := NewUDT(unit, numericalProps, stringProps, scriptProps)
 
   UDTs[unit] = t
-}
-
-func (t *udt) AddModifier(r rune, name string) {
-  t.Modifiers[r] = Modifier{ name }
 }
 
 // parse a UDT string - we already know it's valid
@@ -122,9 +117,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
   if pos != length { // if there is anything remaining
 
-    log("this is left: " + s[pos:])
-
-    if r := rune(s[pos:pos+1][0]); isQuoteChar(r) {
+    if r := rune(s[pos]); isQuoteChar(r) {
       log("UDT has value")
       // we already know that value is valid from lexing
       if isQuoteChar(r) {
@@ -155,7 +148,6 @@ func (t *udt) Parse(s string) map[string]interface{} {
         if pos == length || !isNumeric(rune(s[pos])) {
           break
         } else {
-          log("this is left: " + s[pos:])
           pos++
         }
       }
@@ -164,88 +156,124 @@ func (t *udt) Parse(s string) map[string]interface{} {
         data["value"] = s[valueIdx:pos]  // invalid values are kept as string, e.g. 1.0.0
       } else {
         data["value"] = number
-
       }
     }
   }
 
-  if pos != length {  // if there is anything remaining
-    log("this is left: " + s[pos:])
-
-    allModifiers := ""
-    for r := range t.Modifiers {
-      allModifiers += string(r)
-    }
-
-    log("looking for modifiers out of: " + allModifiers)
-
-    for {
-      if pos == len(s) {
-        break
-      }
-      // next char must be a modifier
-      m := t.Modifiers[rune(s[pos:pos+1][0])]
-      log("found modifier: " + m.name)
-      pos++
-      // find the next modifier
-      nextModifierIdx := strings.IndexAny(s[pos:], allModifiers)
-      if nextModifierIdx < 0 {
-        log("no more modifiers")
-        nextModifierIdx = len(s)  // no more modifiers
-      } else {
-        nextModifierIdx += pos
-      }
-      log(s[pos:])
-      log(s[pos:nextModifierIdx])
-      mValue := s[pos:nextModifierIdx]
-      if mValue == "" {
-        log("with no value --> 1")
-        mValue = "1"
-      } else {
-        log("with value: " + mValue)
-      }
-
-      if number, err := strconv.ParseFloat(mValue, 64); err == nil { // if value is valid number
-        data[m.name] = number
-      } else {
-        data[m.name] = mValue
-      }
-
-      pos = nextModifierIdx
-    }
-
+  for modifier, rawValue := range *MODIFIER_INSTANCES[instanceIdx] {
+    t.addModifierToData(data, modifier, rawValue)
   }
-
 
   for k, v := range t.NumericalProps {
     data[k] = v
   }
 
-  for k, v := range t.StringProps {
+  LoopStringProps: for k, v := range t.StringProps {
+    for _, prop := range t.HiddenProps {
+      if prop == k {
+        continue LoopStringProps  // skip props that should be hidden
+      }
+    }
+    if isModifierChar(rune(k[0])) {
+      continue LoopStringProps  // skip props that start with standard modifier chars TODO: or give them null value?
+    }
     data[k] = v
   }
 
+  for k, v := range t.ScriptProps {
+    data[k] = RunScript(v, data)
+  }
+
   return data
+}
+
+func (t *udt) addModifierToData(data map[string]interface{}, modifier string, value string) {
+  t.HiddenProps = append(t.HiddenProps, modifier)
+  modifierName := t.StringProps[modifier]
+  appendValue := false
+
+  if value == "" {
+    value = "1"
+  }
+
+  // remove quotes
+  value = removeQuotes(value)
+
+  if data[modifierName] != nil {
+    if data[modifierName] == "" {  // TODO: why does this happen?
+      // don't append
+    } else {
+      appendValue = true
+      if _, ok := data[modifierName].([]interface{}); !ok {  // if the value is not already a slice
+        data[modifierName] = []interface{}{ data[modifierName] }  // convert to slice
+      }
+    }
+  }
+  if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
+    if appendValue {
+      data[modifierName] = append(data[modifierName].([]interface{}), number)
+    } else {
+      data[modifierName] = number
+    }
+  } else {
+    if appendValue {
+      data[modifierName] = append(data[modifierName].([]interface{}), value)
+    } else {
+      data[modifierName] = value
+    }
+  }
 }
 
 var UDTs = map[string]*udt{}  // stores user defined types
 var PDTs = map[string]*udt{}  // stores pre-defined types
 
 var INSTANCES []string  // stores the unit of every UDT we find
+var MODIFIER_INSTANCES []*map[string]string  // stores every modifier and raw value we find
 var instanceIdx int = 0  // the current index of INSTANCES we're parsing
 
 // identify the type and parse
-func ParseUDT(input string) map[string]interface{} {
+func ParseUDT(input string) interface{} {
   unit := INSTANCES[instanceIdx]
-  instanceIdx++
+
+  f := func () {
+    instanceIdx++
+  }
+  defer f()
+
   t := UDTs[unit]
   if t == nil {
     t = PDTs[unit]
   }
-  return t.Parse(input)
+  if t.isSpecial && unit == "json" {  // special type - convert to pure json
+    data := t.Parse(input)
+    if data["value"] != nil {
+      var valueData interface{}
+      if _, ok := data["value"].(string); !ok {
+        return data["value"]  // don't need to parse non-strings
+      }
+      err := json.Unmarshal([]byte(data["value"].(string)), &valueData)
+      if err != nil {
+        data["value"] = nil
+        return data
+      }
+      return valueData
+    } else {
+      data["value"] = nil
+      return data
+    }
+
+  } else {
+    return t.Parse(input)
+  }
 }
 
-func defineBuiltInTypes(collectionName string) {
+func DefineBuiltInTypes() {  // these are handled differently
+  PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{})
+  PDTs["json"].isSpecial = true
+  //PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{}) TODO
+}
+
+func defineImportedTypes(collectionName string) {
 
   if collectionName == "si" {
     log("Importing SI Units")
@@ -292,7 +320,8 @@ func defineBuiltInTypes(collectionName string) {
 
     for _, t := range SITypes {
      def := strings.SplitN(t, ",", 3)
-     PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] }, map[rune]Modifier{})
+     PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{ "unit": def[1], "type": def[2] },
+                           map[string]string{})
     }
   }
 
@@ -328,11 +357,11 @@ func defineBuiltInTypes(collectionName string) {
     for _, t := range currencyTypes {
      def := strings.Split(t, ",")
      for _, unit := range def[:len(def)-1] {
-       PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{ "unit": def[len(def)-1], "type": "money" }, map[rune]Modifier{})
+       PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{ "unit": def[len(def)-1], "type": "money" },
+                           map[string]string{})
      }
     }
   }
-
 }
 
 // return true if a rune could be the start of a udt - slightly faster than checking the whole thing

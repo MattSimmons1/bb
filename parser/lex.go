@@ -98,6 +98,10 @@ type lexer struct {
 
 var verbose = false
 
+func SetVerbose() {
+	verbose = true
+}
+
 func log(message string) {
 	if verbose {
 		if message == "lexBb" {
@@ -240,7 +244,7 @@ func lexInlineComment(l *lexer) stateFn {
 	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
 	splitComment := strings.SplitN(cleanedComment, " ", 2)
 	if splitComment[0] == "import" && len(splitComment) > 1 {
-		defineBuiltInTypes(strings.ToLower(splitComment[1]))
+		defineImportedTypes(strings.ToLower(splitComment[1]))
 	}
 	l.pos += Pos(i)
 	l.ignore()
@@ -475,7 +479,7 @@ func (l *lexer) scanUnit() bool {
 Loop:
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || isNumeric(r) || isModifierChar(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
 			log(string(r))
 			// absorb
 		default:
@@ -585,23 +589,64 @@ func (l *lexer) scanNumber(udt bool) bool {
 func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
-Loop:  // loop for multiple modifier/value pairs
+	udt := INSTANCES[len(INSTANCES)-1]
+	rawModifiers := map[string]string{}
+	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise map to store modifiers
+
+	modifierStart := l.pos
+
+  Loop:  // loop for multiple modifier/value pairs
 	for {
-		if isSpace(l.peek()) { // end of DT
-			break Loop
-		}
+		r := l.peek()
+		log(string(r))
 
-		if l.accept(modifiers) {
-			// it's a value
-			if !l.scanValue() {
-				return false
+		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
+		// then check it's a known modifier - if not then stop
+		// then scan value
+		if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+			// TODO: check for dot not followed by number or dash not followed by number or dot then number
+			// check it's a known modifier
+
+			m := l.input[modifierStart:l.pos]
+			backtrackCharacters := 0
+
+		  LoopBacktrack: for {  // loop for multiple lengths of modifier, i.e. #>? then #> then #
+
+				if len(m) == backtrackCharacters {
+					log("nothing matches " + m)
+					break LoopBacktrack  // if we've already looked for modifiers of length 1 then give up
+				} else {
+					m2 := m[:len(m)-backtrackCharacters]
+
+					for modifier := range UDTs[udt].StringProps { // get all the modifiers for the current type
+						if modifier == m2 {
+							l.pos = l.pos - Pos(backtrackCharacters)
+							log("modifier is: \033[92m" + m2 + "\033[0m")
+							if !l.scanValue() {
+								log("value is invalid")
+								return false
+							} else {
+								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
+								rawModifiers[m2] = l.input[modifierStart+Pos(len(m2)):l.pos]  // store the modifier and value we've found
+								// keep going - onto the next modifier
+								//l.next()
+								modifierStart = l.pos
+								continue Loop
+							}
+						}
+					}
+					log("Couldn't find a match for " + m2)
+					// if there are no matches - look for a shorter modifier
+					backtrackCharacters += 1
+				}
 			}
-		} else {  // invalid
-		  return false
-		  //log(string(l.peek()) + " is not a modifier")
-			//break Loop
-		}
 
+			// if there are still no matches - reset then stop (assume the next character is part of something else)
+			l.pos = modifierStart
+			return true
+		} else {
+			l.next()
+		}
 	}
 
 	return true
@@ -695,9 +740,9 @@ Loop:
 	return lexBb
 }
 
-// TODO: = is reserved for definitons
-
+//
 func isModifierChar(r rune) bool {
+	log("is " + string(r) + " a modifier?")
 	return strings.ContainsRune(modifiers, r)
 }
 
@@ -710,9 +755,9 @@ func isSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\r' || r == '\n'
 }
 
-// is character valid in a unit? i.e. not a space, modifier char, or number
+// is character valid in a unit? i.e. not a space, or number
 func isUnitChar(r rune) bool {
-	return !isSpace(r) && !unicode.IsDigit(r) && !isModifierChar(r)
+	return !isSpace(r) && !unicode.IsDigit(r)
 }
 
 func isNumeric(r rune) bool {
