@@ -160,8 +160,8 @@ func (t *udt) Parse(s string) map[string]interface{} {
     }
   }
 
-  for modifier, rawValue := range *MODIFIER_INSTANCES[instanceIdx] {
-    t.addModifierToData(data, modifier, rawValue)
+  for _, modifier := range *MODIFIER_INSTANCES[instanceIdx] {
+    t.addModifierToData(data, modifier[0], modifier[1])
   }
 
   for k, v := range t.NumericalProps {
@@ -196,7 +196,6 @@ func (t *udt) addModifierToData(data map[string]interface{}, modifier string, va
     value = "1"
   }
 
-  // remove quotes
   value = removeQuotes(value)
 
   if data[modifierName] != nil {
@@ -228,7 +227,7 @@ var UDTs = map[string]*udt{}  // stores user defined types
 var PDTs = map[string]*udt{}  // stores pre-defined types
 
 var INSTANCES []string  // stores the unit of every UDT we find
-var MODIFIER_INSTANCES []*map[string]string  // stores every modifier and raw value we find
+var MODIFIER_INSTANCES []*[][2]string  // stores every modifier and raw value we find
 var instanceIdx int = 0  // the current index of INSTANCES we're parsing
 
 // identify the type and parse

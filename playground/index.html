@@ -26,8 +26,27 @@
 <p>
 
 	<div><textarea id="bbInput" name="bbInput" rows="20" cols="80" onchange="convert();">
-// import si
-50kg 20kg 12.5kg</textarea></div>
+A = {type: note, note: 21}
+a = {type: note, note: 22}
+B = {type: note, note: 23}
+C = {type: note, note: 24}
+c = {type: note, note: 25}
+D = {type: note, note: 26}
+d = {type: note, note: 27}
+E = {type: note, note: 28}
+F = {type: note, note: 29}
+f = {type: note, note: 30}
+G = {type: note, note: 31}
+g = {type: note, note: 32}
+r = {type: rest}
+
+A4 B4
+a4 B4
+r
+a4 a4 A3 B3 C3 D3 E3 F3 G3
+</textarea></div>
+<button onclick="play()">Play</button>
+
 
 	<div class="output"><pre id="jsonOutput"></pre></div>
 
@@ -53,12 +72,12 @@
 		}).then(init);
 
 		async function init() {
-			await go.run(inst);  // this runs the init() function of bb.go
+			await go.run(inst).then(convert);  // this runs the init() function of bb.go
 
 			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
 		}
 
-
+  var output;
 	//
 	// playground
 	//
@@ -66,7 +85,7 @@
 
 		const input = document.getElementById("bbInput").value;
 		console.log(input);
-		let output = wasm.bb(input);
+		output = wasm.bb(input);
 		console.log(output)
 
 		if (typeof(output) === "undefined") {
@@ -86,6 +105,49 @@
 	}
 
   document.getElementById("bbInput").oninput=convert;
+
+	//
+		function noteToFreq(note) {
+			let a = 440;
+			return (a / 32) * (2 ** ((note - 9) / 12));
+		}
+
+	context = new AudioContext;
+	const oscillator = context.createOscillator();
+	oscillator.type = "triangle";
+  const gain = context.createGain();
+	oscillator.connect(gain);
+	gain.connect(context.destination);
+		gain.gain.value = 0;
+		oscillator.start(0);
+
+
+	function play() {
+		try {
+		  context.resume();
+		}
+		catch (e) {
+
+		}
+
+		output.map((d, i) => {
+			if (d.type === "note") {
+				setTimeout(() => {
+					gain.gain.linearRampToValueAtTime(1, 50/1000);
+					setTimeout(() => gain.gain.linearRampToValueAtTime(0, 50/1000), 50);
+
+					oscillator.frequency.linearRampToValueAtTime(noteToFreq((d.value ? d.value : 0) * 12 + d.note), 0);
+
+				}, i * 100)
+			}
+		});
+
+		// gain.gain.value.linearRampToValueAtTime(0, 100*output.length)
+		setTimeout(() => gain.gain.linearRampToValueAtTime(0, 10/1000), 100*output.length);
+
+	}
+
+
 
 </script>
 </body>

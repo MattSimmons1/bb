@@ -113,4 +113,5 @@ v1.0.0
 - [ ] structures/arrays
 - [ ] allow single - and . as UDTs or Modifiers
 - [ ] safe mode / strict mode
+- [ ] MIDI import
 */

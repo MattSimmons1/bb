@@ -10,3 +10,6 @@ json23
 
 //CAT = { has: has }
 //CAThas"a hat"has"whiskers"
+
+A = {type: note, note: 21, +a: add}
+A4+a4+a2

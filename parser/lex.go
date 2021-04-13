@@ -590,8 +590,8 @@ func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
 	udt := INSTANCES[len(INSTANCES)-1]
-	rawModifiers := map[string]string{}
-	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise map to store modifiers
+	var rawModifiers [][2]string
+	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise array to store modifiers
 
 	modifierStart := l.pos
 
@@ -627,7 +627,7 @@ func (l *lexer) scanModifier() bool {
 								return false
 							} else {
 								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
-								rawModifiers[m2] = l.input[modifierStart+Pos(len(m2)):l.pos]  // store the modifier and value we've found
+								rawModifiers = append(rawModifiers, [2]string{ m2, l.input[modifierStart+Pos(len(m2)):l.pos] })  // store the modifier and value we've found
 								// keep going - onto the next modifier
 								//l.next()
 								modifierStart = l.pos
