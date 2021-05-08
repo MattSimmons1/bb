@@ -25,11 +25,16 @@ func Debug(input string) {
   parser.Debug(input)
 }
 
-func Convert(input string) {
+func Convert(input string, injectionMode bool) {
   input = strings.Replace(input, "\\n", "\n", -1)  // convert raw escaped chars to literals
   input = strings.Replace(input, "\\t", "\t", -1)
 
-  data := parser.Parse(input)
+  data := make([]interface{}, 0)
+  if injectionMode {
+    data = parser.ParseInjectionMode(input)
+  } else {
+    data = parser.Parse(input)
+  }
 
   j, err := json.Marshal(data)
   if err != nil {
@@ -39,7 +44,6 @@ func Convert(input string) {
   fmt.Println(string(j))
 }
 
-
 func main() {
   parser.DefineBuiltInTypes()
 
@@ -47,6 +51,7 @@ if err := func() (rootCmd *cobra.Command) {
   var IsPreview bool
   var IsDebug bool
   var IsVerbose bool
+  var isInjectionMode bool
 
   rootCmd = &cobra.Command{
     Use: "bb",
@@ -81,7 +86,7 @@ if err := func() (rootCmd *cobra.Command) {
         Preview(input)
         return
       }
-      Convert(input)
+      Convert(input, isInjectionMode)
       return
     },
   }
@@ -93,6 +98,9 @@ if err := func() (rootCmd *cobra.Command) {
 
   rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
     "show each step of the parsing process")
+
+  rootCmd.PersistentFlags().BoolVarP(&isInjectionMode, "injection-mode", "i", false,
+    "convert bb found in the comment strings of another language")
 
   return
   }().Execute(); err != nil {

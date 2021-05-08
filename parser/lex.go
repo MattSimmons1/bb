@@ -105,9 +105,13 @@ func SetVerbose() {
 func log(message string) {
 	if verbose {
 		if message == "lexBb" {
-			fmt.Print("\n", message)
+			fmt.Print("\n", "\033[92m", message, "\033[0m")
 		} else {
-			fmt.Print("/" + message)
+			if strings.HasPrefix(message, "lex") {
+			  fmt.Print("/", "\033[92m", message, "\033[0m")
+			} else {
+			  fmt.Print("/", message)
+			}
 		}
 	}
 }

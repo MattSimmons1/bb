@@ -54,6 +54,12 @@ func Parse(input string) []interface{} {
   return row
 }
 
+func ParseInjectionMode(input string) []interface{}  {
+	injectedInput := lexInjectionMode(input)
+
+	return Parse(injectedInput)
+}
+
 func Debug(input string) {
 
 	l := lex(input)

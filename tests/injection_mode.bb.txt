@@ -1,0 +1,9 @@
+// normal comment
+
+function cooleh() {
+  return "fooleh"
+}
+
+//bb ∆ = { type: wooleh }
+//bb 12∆ 10∆`wow`
+console.log("cooleh wooleh")
