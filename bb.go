@@ -99,19 +99,3 @@ func main() {
     log.Panicln(err)
   }
 }
-
-/*
-
-To Do
-MVP
-- [x] anything can be a modifier
-- [ ] Invalid DTs should become strings? strict mode?
-- [ ] rows should become an array of arrays
-v1.0.0
-- [ ] json PDT
-- [ ] yaml PDT
-- [ ] structures/arrays
-- [ ] allow single - and . as UDTs or Modifiers
-- [ ] safe mode / strict mode
-- [ ] MIDI import
-*/
