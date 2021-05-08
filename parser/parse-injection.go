@@ -60,12 +60,17 @@ func lexInjection(l *lexer) stateFn {
   case r == '/':
       if len(l.input[l.pos:]) > 2 {
 
-        log("is '" + l.input[l.pos:l.pos+3] + "' injected bb?")
+        log("is '/" + l.input[l.pos:l.pos+3] + "' injected bb?")
         if l.input[l.pos:l.pos+3] == "/bb" {
           log("yes")
           l.pos += 3
           l.ignore()
           return lexInlineInjection
+        } else if l.input[l.pos:l.pos+3] == "*bb" {
+          log("yes")
+          l.pos += 3
+          l.ignore()
+          return lexMultilineInjection
         }
       }
 
@@ -75,7 +80,6 @@ func lexInjection(l *lexer) stateFn {
   default:
     return lexInjection
   }
-  return lexInjection
 }
 
 // injected bb that can only be on one line
@@ -91,12 +95,18 @@ func lexInlineInjection(l *lexer) stateFn {
   }
 }
 
-func lexOtherLanguage(l *lexer) stateFn {
-  log("lexOtherLanguage")
+
+// injected bb that can only be on one line
+func lexMultilineInjection(l *lexer) stateFn {
+  log("lexMultilineInjection")
   for {
-    if r := l.next(); r == '\n' || r == eof {
-      l.ignore()
-      return lexInjection
+    if r := l.next(); r == '*' || r == eof {
+      if l.next() == '/' {
+        l.pos -= 2
+        l.emit(itemString)
+        l.pos += 2
+        return lexInjection
+      }
     } else {
       log(string(l.peek()))
     }

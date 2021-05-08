@@ -7,3 +7,6 @@ function cooleh() {
 //bb ∆ = { type: wooleh }
 //bb 12∆ 10∆`wow`
 console.log("cooleh wooleh")
+/*bb
+"cooleh" 22∆
+*/
