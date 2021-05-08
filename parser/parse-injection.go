@@ -58,13 +58,12 @@ func lexInjection(l *lexer) stateFn {
     l.emit(itemEOF)
     return nil
   case r == '/':
-    if l.accept("/") {
-      if len(l.input[l.pos:]) > 1 {
+      if len(l.input[l.pos:]) > 2 {
 
-        log("is '" + l.input[l.pos:l.pos+2] + "' injected bb?")
-        if l.input[l.pos:l.pos+2] == "bb" {
+        log("is '" + l.input[l.pos:l.pos+3] + "' injected bb?")
+        if l.input[l.pos:l.pos+3] == "/bb" {
           log("yes")
-          l.pos += 2
+          l.pos += 3
           l.ignore()
           return lexInlineInjection
         }
@@ -73,7 +72,6 @@ func lexInjection(l *lexer) stateFn {
       log("no")
       return lexInjection
 
-    }
   default:
     return lexInjection
   }
