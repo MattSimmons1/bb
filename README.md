@@ -37,7 +37,6 @@ $ bb my_data.bb.txt
 [{ "type": "message", "value": "hello world" }]
 ```
 
-
 | bb  | Interpretation  | Explanation  |
 |-----|-----------------|--------------| 
 | r = { type: survey response }<br>4r"no" 10r"yes" | [{"type":"survey response", "quantity": 4, "value": "no"}, {"type":"survey response", "quantity": 10, "value": "yes"}] | The value on the left side of the unit is called the 'quantity' and the value on the right side is the 'value'. Values can be numbers or quoted strings. Quantities can only be numbers.         |
@@ -87,6 +86,35 @@ $500 £10 50GBP 0.12BTC
 ```
 
 ```json
+[
+  {"quantity":1,"type":"money","unit":"United States dollar","value":500},
+  {"quantity":1,"type":"money","unit":"British pound","value":10},
+  {"quantity":50,"type":"money","unit":"British pound"},
+  {"quantity":0.12,"type":"money","unit":"Bitcoin"}
+]
+```
 
 
+### Injected bb
+
+bb can also be easily extracted and parsed from within comment strings of other language files.
+
+Any comment starting with bb is captured by the parser. For example:
+
+```sql
+/*bb
+md = { type: markdown }
+md`# My Amazing Query`
+json`{"destination": "dataset.new_table", "append": false}`
+*/
+
+--bb md`Step 1: select all bars`
+SELECT * FROM dataset.table
+WHERE foo = 'bar'
+```
+
+Then use `--injection-mode` or `-i` when converting to json:
+
+```shell-session
+$ bb my-query.sql -i
 ```
