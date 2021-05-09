@@ -40,43 +40,47 @@ $ bb my_data.bb.txt
 [{ "type": "message", "value": "hello world" }]
 ```
 
-| bb  | Interpretation  | Explanation  |
-|-----|-----------------|--------------| 
-| r = { type: survey response }<br>4r"no" 10r"yes" | [{"type":"survey response", "quantity": 4, "value": "no"}, {"type":"survey response", "quantity": 10, "value": "yes"}] | The value on the left side of the unit is called the 'quantity' and the value on the right side is the 'value'. Values can be numbers or quoted strings. Quantities can only be numbers.         |
-| y = { type: survey response, "response": "yes" }<br>n = { type: survey response, "response": "no" }<br>4n 10y |  | A different way of representing the same as above, except two types are defined, which allows for easier data entry. |
-| y = { type: survey response, "response": "yes" }<br>n = { type: survey response, "response": "no" }<br>yynnyynynyyyyy | [{"type":"survey response", "quantity": 4, "response": "no"}, {"type":"survey response", "quantity": 10, "response": "yes"}] | A different way of representing the same as above, except the order is preserved. |
-| ∆ = { food: Pizza, @: price, total: d => d.price * d.quantity }<br>34∆@19.50 | [{"food": "Pizza", "quantity": 34, "price": 19.5, "total": 663 }] | '@' is defined as a modifier. The value following '@' will be the price. | 
+### Basic Syntax
 
+| Syntax      | Usage | Result    |
+|-------------|-------|-----------|
+|number       | 12    | 12        | 
+|string       | foo    | "foo"        | 
+|safe string  | "foo"    | "foo"        | 
+|array | 1 2 "foo"    | \[1, 2, "foo"]        | 
+|quantity  | ∆ = { }<br>3∆    | { "quantity": 3 } |
+|numeric value  | ∆ = { }<br>∆5    | { "value": 5 } |
+|string value  | ∆ = { }<br>∆\`foo`    | { "value": "foo" } |
+|numeric prop | ∆ = { foo: 100 }<br>∆    | { "foo": 100 }   |
+|string prop  | ∆ = { foo: bar }<br>∆    | { "foo": "bar" } |
+|modifier | ∆ = { $: foo }<br>∆$1    | { "foo": 1 } |
+|repeated modifier | ∆ = { $: foo }<br>∆$3$\`bar`    | { "foo": \[3, \`bar`] } |
+|script prop | ∆ = { foo: d => 30 * 2 }<br>∆    | { "foo": 60 } |
 
-### Pre-Defined Types
-
-| Unit  | Example | Meaning  |
-|-------|---------|----------|
-| json  | ```json`{"foo", [1, 2, 3]}` ``` => `{"foo", [1, 2, 3]}` | The value is parsed as JSON |
-
-
-### Reserved Characters
+### Reserved Characters, Key Words, and Other Syntax
 
 These can't be used as units or modifiers
 
-| Character  | Meaning  |
+| Syntax| Meaning    |
 |------------|----------|
 | **=**      | Defines a type |
 | **.**      | Decimal point  |
 | **-**      | Negative sign  |
 | **{** **}** | Start and end of a code block or structure |
-
-
-### Key Words and Other Syntax
-
-| Syntax| Meaning    |
-|-------|------------|
 | true  | JSON true  |
 | false | JSON false |
 | null  | JSON null  |
 | // foo  | inline comment |
 | /* foo<br>bar \*/ | multiline comment | 
 | // import currency | import statement - see [imported types](#imported-types)  |  
+
+
+### Pre-Defined Types
+
+| Unit  | Example | Meaning  |
+|-------|---------|----------|
+| json  | ```json`{"foo": [1, 2, 3]}` ``` => `{"foo": [1, 2, 3]}` | The value is parsed as JSON |
+
 
 ### Imported Types
 
@@ -121,4 +125,18 @@ Then use `--injection-mode` or `-i` when converting to json:
 $ bb my-query.sql -i
 ```
 
+### Examples
+
+The bb: 
+```
+r = { type: survey response }
+4r"no" 10r"yes"
+```
+becomes:
+ 
+```json
+[{"type":"survey response", "quantity": 4, "value": "no"}, {"type":"survey response", "quantity": 10, "value": "yes"}]
+```
+ 
+Explanation: The value on the left side of the unit is called the 'quantity' and the value on the right side is the 'value'. Values can be numbers or quoted strings. Quantities can only be numbers. 
 
