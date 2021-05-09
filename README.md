@@ -20,6 +20,8 @@ Is interpreted as:
 ] 
 ```
 
+Try it out in your browser with the [**Playground**](./playground)!
+
 
 ### Usage
 
@@ -119,11 +121,4 @@ Then use `--injection-mode` or `-i` when converting to json:
 $ bb my-query.sql -i
 ```
 
-### Build
-
-    go build
-
-Build Web Assembly: 
-
-    GOOS=js GOARCH=wasm go build -o bb.wasm ./wasm.go && cp bb.wasm playground/bb.wasm 
 
