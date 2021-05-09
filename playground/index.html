@@ -11,21 +11,37 @@
 		margin: 0;
 		background: #e3e3ec;
 	}
+	.main {
+		display: grid;
+		grid-template-columns: 1fr 1fr 1fr;
+		gap: 20px;
+		margin: 20px;
+	}
 	#bbInput, #jsonOutput {
 		color: white;
     background: #111214;
 		border: none;
 		border-radius: 10px;
 		padding: 20px;
+		margin: 0;
+	}
+	.input {
+		width: auto;
+	}
+	#jsonOutput {
+		color: #111214;
+		background: #aaa;
+		min-height: 300px;
 	}
 	.output {
-		width: 500px;
+		width: auto;
+		max-height: 344px;
+		overflow: scroll;
 	}
 </style>
 
-<p>
-
-	<div><textarea id="bbInput" name="bbInput" rows="20" cols="80" onchange="convert();">
+<div class="main">
+	<div class="input"><textarea id="bbInput" name="bbInput" rows="20" cols="60" onchange="convert();">
 A = {type: note, note: 21}
 a = {type: note, note: 22}
 B = {type: note, note: 23}
@@ -44,11 +60,12 @@ A4 B4
 a4 B4
 r
 a4 a4 A3 B3 C3 D3 E3 F3 G3
-</textarea></div>
+    </textarea>
+	</div>
+  <div class="output"><pre id="jsonOutput"></pre></div>
+</div>
+
 <button onclick="play()">Play</button>
-
-
-	<div class="output"><pre id="jsonOutput"></pre></div>
 
 
 	<script src="js/wasm_exec.js"></script>
@@ -100,7 +117,7 @@ a4 a4 A3 B3 C3 D3 E3 F3 G3
 			output = "ERROR";
 		}
 
-		document.getElementById("jsonOutput").innerText = JSON.stringify(output, null, 4);
+		document.getElementById("jsonOutput").innerText = JSON.stringify(output, null, 2);
 
 	}
 
