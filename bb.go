@@ -59,7 +59,7 @@ if err := func() (rootCmd *cobra.Command) {
     Args: cobra.ArbitraryArgs,
     Run: func(c *cobra.Command, args []string){
       if len(args) < 1 {
-        fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
+        fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb --help\" for more information.")
         return
       }
 
