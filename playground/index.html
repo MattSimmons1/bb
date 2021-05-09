@@ -4,21 +4,22 @@
 <head>
 	<meta charset="utf-8">
 	<title>bb</title>
+	<link rel="preconnect" href="https://fonts.gstatic.com">
+	<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&display=swap" rel="stylesheet">
 </head>
 
 <style>
 	body {
-		margin: 0;
+		margin: 40px 100px;
 		background: #e3e3ec;
+		color: #111214;
+		font-family: 'Lato', sans-serif;
+		font-weight: lighter;
 	}
 	.main {
-		display: grid;
-		grid-template-columns: 1fr 1fr 1fr;
-		gap: 20px;
-		margin: 20px;
 	}
 	#bbInput, #jsonOutput {
-		color: white;
+		color: #e3e3ec;
     background: #111214;
 		border: none;
 		border-radius: 10px;
@@ -30,45 +31,29 @@
 	}
 	#jsonOutput {
 		color: #111214;
-		background: #aaa;
+		background: #bdbeed;
 		min-height: 300px;
 	}
 	.output {
-		width: auto;
-		max-height: 344px;
+		width: 700px;
+		max-height: 300px;
+		border-radius: 10px;
 		overflow: scroll;
 	}
 </style>
-
+<h1>bb Playground</h1>
+<p>Type bb in the box below:</p>
 <div class="main">
-	<div class="input"><textarea id="bbInput" name="bbInput" rows="20" cols="60" onchange="convert();">
-A = {type: note, note: 21}
-a = {type: note, note: 22}
-B = {type: note, note: 23}
-C = {type: note, note: 24}
-c = {type: note, note: 25}
-D = {type: note, note: 26}
-d = {type: note, note: 27}
-E = {type: note, note: 28}
-F = {type: note, note: 29}
-f = {type: note, note: 30}
-G = {type: note, note: 31}
-g = {type: note, note: 32}
-r = {type: rest}
+	<div class="input"><textarea id="bbInput" name="bbInput" rows="14" cols="80" onchange="convert();">
+a = { type: apple, price: d => "$" + (d.quantity * 0.50).toFixed(2) }
+b = { type: banana, *: colour }
 
-json`{"wow":"cool"}`
-
-A4 B4
-a4 B4
-r
-a4 a4 A3 B3 C3 D3 E3 F3 G3
+9a b*`yellow` 4b*`green`
     </textarea>
 	</div>
+	<p>JSON Output</p>
   <div class="output"><pre id="jsonOutput"></pre></div>
 </div>
-
-<button onclick="play()">Play</button>
-
 
 	<script src="js/wasm_exec.js"></script>
 	<script>
@@ -88,10 +73,10 @@ a4 a4 A3 B3 C3 D3 E3 F3 G3
 			inst = result.instance;
 		}).catch((err) => {
 			console.error(err);
-		}).then(init);
+		}).then(init)
 
 		async function init() {
-			await go.run(inst).then(convert);  // this runs the init() function of bb.go
+			await go.run(inst);  // this runs the init() function of bb.go
 
 			inst = await WebAssembly.instantiate(mod, go.importObject); // reset instance
 		}
@@ -102,10 +87,16 @@ a4 a4 A3 B3 C3 D3 E3 F3 G3
 	//
   function convert() {
 
+  	if (!wasm.bb) {
+  		setTimeout(convert, 10);
+			return
+		}
+
 		const input = document.getElementById("bbInput").value;
+		console.log("convert");
 		console.log(input);
 		output = wasm.bb(input);
-		console.log(output)
+		console.log(output);
 
 		if (typeof(output) === "undefined") {
 			const go = new Go();
@@ -116,7 +107,7 @@ a4 a4 A3 B3 C3 D3 E3 F3 G3
 			}).catch((err) => {
 				console.error(err);
 			}).then(init);
-			output = "ERROR";
+			output = "Syntax Error - bb couldn't parse the input.";
 		}
 
 		document.getElementById("jsonOutput").innerText = JSON.stringify(output, null, 2);
@@ -124,49 +115,7 @@ a4 a4 A3 B3 C3 D3 E3 F3 G3
 	}
 
   document.getElementById("bbInput").oninput=convert;
-
-	//
-		function noteToFreq(note) {
-			let a = 440;
-			return (a / 32) * (2 ** ((note - 9) / 12));
-		}
-
-	context = new AudioContext;
-	const oscillator = context.createOscillator();
-	oscillator.type = "triangle";
-  const gain = context.createGain();
-	oscillator.connect(gain);
-	gain.connect(context.destination);
-		gain.gain.value = 0;
-		oscillator.start(0);
-
-
-	function play() {
-		try {
-		  context.resume();
-		}
-		catch (e) {
-
-		}
-
-		output.map((d, i) => {
-			if (d.type === "note") {
-				setTimeout(() => {
-					gain.gain.linearRampToValueAtTime(1, 50/1000);
-					setTimeout(() => gain.gain.linearRampToValueAtTime(0, 50/1000), 50);
-
-					oscillator.frequency.linearRampToValueAtTime(noteToFreq((d.value ? d.value : 0) * 12 + d.note), 0);
-
-				}, i * 100)
-			}
-		});
-
-		// gain.gain.value.linearRampToValueAtTime(0, 100*output.length)
-		setTimeout(() => gain.gain.linearRampToValueAtTime(0, 10/1000), 100*output.length);
-
-	}
-
-
+	convert()
 
 </script>
 </body>
