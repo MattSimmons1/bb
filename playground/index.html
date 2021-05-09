@@ -16,6 +16,9 @@
 		font-family: 'Lato', sans-serif;
 		font-weight: lighter;
 	}
+	a {
+		color: #bebeee;
+	}
 	.main {
 	}
 	#bbInput, #jsonOutput {
@@ -31,7 +34,7 @@
 	}
 	#jsonOutput {
 		color: #111214;
-		background: #bdbeed;
+		background: #bebeee;
 		min-height: 300px;
 	}
 	.output {
@@ -41,15 +44,15 @@
 		overflow: scroll;
 	}
 </style>
-<h1>bb Playground</h1>
-<p>Type bb in the box below:</p>
+<h1><a href="../">bb</a> playground</h1>
+<p>Write some bb in the box below:</p>
 <div class="main">
 	<div class="input"><textarea id="bbInput" name="bbInput" rows="14" cols="80" onchange="convert();">
 a = { type: apple, price: d => "$" + (d.quantity * 0.50).toFixed(2) }
 b = { type: banana, *: colour }
 
 9a b*`yellow` 4b*`green`
-    </textarea>
+</textarea>
 	</div>
 	<p>JSON Output</p>
   <div class="output"><pre id="jsonOutput"></pre></div>
