@@ -681,14 +681,8 @@ Loop:
 				log("found stray backslash")
 				l.backup()  // backslash is absorbed
 			}
-		case quoted && r != quoteChar && r != '\n':
+		case quoted && r != quoteChar:
 			// absorb
-		//case r == '\n':
-		//	if quoted {
-		//		l.errorf("unterminated quoted string")
-		//		return false
-		//	}
-		//	fallthrough
 		default:
 			if quoted {
         if r != quoteChar {

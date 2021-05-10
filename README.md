@@ -84,14 +84,17 @@ These can't be used as units or modifiers
 
 ### Pre-Defined Types
 
-| Unit  | Example | Meaning  |
+The following types are pre-defined, and behave differently: 
+
+| Unit  | Example | Behaviour  |
 |-------|---------|----------|
-| json  | ```json`{"foo": [1, 2, 3]}` ``` => `{"foo": [1, 2, 3]}` | The value is parsed as JSON |
+| json  | ```json`{"foo": [1, 2, 3]}` ``` | value is converted to JSON |
+| yaml  | ```yaml`foo: bar` ```           | value is converted to YAML |
 
 
 ### Imported Types
 
-Commonly used types can be optionally imported so that they don't need to be defined. For example:
+Commonly used types can be imported so that they don't need to be defined. For example:
 
 ```text
 // import currency
@@ -117,11 +120,14 @@ Any comment starting with bb is captured by the parser. For example:
 ```sql
 /*bb
 md = { type: markdown }
+yaml`
+  destination: dataset.new_table
+  append: false
+`
 md`# My Amazing Query`
-json`{"destination": "dataset.new_table", "append": false}`
 */
 
---bb md`Step 1: select all bars`
+--bb md`Step 1: Select all bars`
 SELECT * FROM dataset.table
 WHERE foo = 'bar'
 ```
@@ -130,6 +136,16 @@ Then use `--injection-mode` or `-i` when converting to json:
 
 ```shell-session
 $ bb my-query.sql -i
+```
+
+This would return:
+
+```json
+[
+  {"destination": "dataset.new_table", "append": false},
+  {"type": "markdown", "value": "# My Amazing Query"},
+  {"type": "markdown", "value": "Step 1: Select all bars"}
+]
 ```
 
 ### Examples
