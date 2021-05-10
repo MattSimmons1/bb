@@ -11,6 +11,9 @@ import (
 func main() {
   fmt.Println("Hello wasm")
   js.Global().Get("wasm").Set("bb", js.FuncOf(WASMConvert))
+
+  parser.DefineBuiltInTypes()
+
   select {}  // don't exit
 }
 
