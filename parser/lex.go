@@ -681,7 +681,7 @@ Loop:
 				log("found stray backslash")
 				l.backup()  // backslash is absorbed
 			}
-		case quoted && r != quoteChar:
+		case quoted && r != quoteChar && r != eof:
 			// absorb
 		default:
 			if quoted {
