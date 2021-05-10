@@ -102,14 +102,13 @@ func (t *udt) Parse(s string) map[string]interface{} {
   data := make(map[string]interface{})
 
   quantity := s[0:pos]
-  if quantity == "" {
-    quantity = "1"
-  }
-  number, err := strconv.ParseFloat(quantity, 64)
-  if err != nil {
-    data["quantity"] = quantity  // invalid quantities are kept as string, e.g. 1.0.0
-  } else {
-    data["quantity"] = number
+  if quantity != "" {
+    number, err := strconv.ParseFloat(quantity, 64)
+    if err != nil {
+      data["quantity"] = quantity  // invalid quantities are kept as string, e.g. 1.0.0
+    } else {
+      data["quantity"] = number
+    }
   }
 
   pos += len(t.Unit)
@@ -297,6 +296,7 @@ func DefineBuiltInTypes() {  // these are handled differently
   PDTs["json"].isSpecial = true
   PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{})
   PDTs["yaml"].isSpecial = true
+  PDTs["md"] = NewUDT("md", map[string]float64{}, map[string]string{ "type": "markdown" }, map[string]string{})
 }
 
 func defineImportedTypes(collectionName string) {
