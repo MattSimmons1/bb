@@ -84,10 +84,11 @@ These can't be used as units or modifiers
 
 ### Pre-Defined Types
 
-The following types are pre-defined, and behave differently: 
+The following types are pre-defined. some behave differently: 
 
 | Unit  | Example | Behaviour  |
-|-------|---------|----------|
+|-------|---------|------------|
+| md    | ```md`hello` ```                | normal - represents markdown |
 | json  | ```json`{"foo": [1, 2, 3]}` ``` | value is converted to JSON |
 | yaml  | ```yaml`foo: bar` ```           | value is converted to YAML |
 
