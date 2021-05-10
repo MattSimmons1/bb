@@ -8,5 +8,15 @@ function cooleh() {
 //bb 12∆ 10∆`wow`
 console.log("cooleh wooleh")
 /*bb
-"cooleh" 22∆
+  "cooleh" 22∆
+
+  // ignore this
 */
+
+#bb python style comment
+# ignore this
+--bb md`SQL style comment`
+-- ignore this
+
+--b ignore
+#
