@@ -3,6 +3,7 @@ package parser
 
 import (
   "encoding/json"
+  "gopkg.in/yaml.v2"
   "strconv"
   "strings"
   "unicode"
@@ -244,23 +245,48 @@ func ParseUDT(input string) interface{} {
   if t == nil {
     t = PDTs[unit]
   }
-  if t.isSpecial && unit == "json" {  // special type - convert to pure json
-    data := t.Parse(input)
-    if data["value"] != nil {
-      var valueData interface{}
-      if _, ok := data["value"].(string); !ok {
-        return data["value"]  // don't need to parse non-strings
-      }
-      err := json.Unmarshal([]byte(data["value"].(string)), &valueData)
-      if err != nil {
+  if t.isSpecial {  // special type - convert to pure json
+    if unit == "json" {
+      data := t.Parse(input)
+      if data["value"] != nil {
+        var valueData interface{}
+        if _, ok := data["value"].(string); !ok {
+          return data["value"]  // don't need to parse non-strings
+        }
+        err := json.Unmarshal([]byte(data["value"].(string)), &valueData)
+        if err != nil {
+          data["value"] = nil
+          return data
+        }
+        return valueData
+      } else {
         data["value"] = nil
         return data
       }
-      return valueData
+
     } else {
-      data["value"] = nil
-      return data
+    //} else if unit == "yaml" {
+
+      data := t.Parse(input)
+      if data["value"] != nil {
+
+        if _, ok := data["value"].(string); !ok {
+          return data // don't need to parse non-strings
+        }
+        var valueData interface{}
+        err := yaml.Unmarshal([]byte(data["value"].(string)), &valueData)
+        if err != nil {
+          data["value"] = nil
+          return data
+        }
+        valueData = convert(valueData)
+        return valueData
+      } else {
+        data["value"] = nil
+        return data
+      }
     }
+
 
   } else {
     return t.Parse(input)
@@ -270,7 +296,8 @@ func ParseUDT(input string) interface{} {
 func DefineBuiltInTypes() {  // these are handled differently
   PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{})
   PDTs["json"].isSpecial = true
-  //PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{}) TODO
+  PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{})
+  PDTs["yaml"].isSpecial = true
 }
 
 func defineImportedTypes(collectionName string) {
@@ -388,4 +415,22 @@ func couldBeUDT(r rune) bool {
   }
   log("could " + string(r) + " be a udt? no.")
   return false
+}
+
+// convert interface from yaml.Unmarshal to one that will work with json.Marshal
+// from https://stackoverflow.com/questions/40737122/convert-yaml-to-json-without-struct
+func convert(i interface{}) interface{} {
+  switch x := i.(type) {
+  case map[interface{}]interface{}:
+    m2 := map[string]interface{}{}
+    for k, v := range x {
+      m2[k.(string)] = convert(v)
+    }
+    return m2
+  case []interface{}:
+    for i, v := range x {
+      x[i] = convert(v)
+    }
+  }
+  return i
 }
