@@ -58,10 +58,10 @@ $ bb my_data.bb.txt
 |quantity      | ∆ = { }<br>3∆    | `{ "quantity": 3 }` |
 |numeric value | ∆ = { }<br>∆5    | `{ "value": 5 }` |
 |string value  | ∆ = { }<br>∆\`foo`    | `{ "value": "foo" }` |
-|numeric prop  | ∆ = { foo: 100 }<br>∆    |` { "foo": 100 }`   |
+|numeric prop  | ∆ = { foo: 100 }<br>∆    | `{ "foo": 100 }`  |
 |string prop   | ∆ = { foo: bar }<br>∆    | `{ "foo": "bar" }` |
-|modifier          | ∆ = { $: foo }<br>∆$1        | `{ "foo": 1 }`          |
-|repeated modifier | ∆ = { $: foo }<br>∆$3$\`bar` | `{ "foo": [3, "bar"] }` |
+|modifier          | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
+|repeated modifier | ∆ = { +: foo }<br>∆+3+\`bar` | `{ "foo": [3, "bar"] }` |
 |script prop       | ∆ = { foo: d => 2 * 2 }<br>∆ | `{ "foo": 4 }`          |
 
 ### Reserved Characters, Key Words, and Other Syntax
@@ -119,7 +119,6 @@ Any comment starting with bb is captured by the parser. For example:
 
 ```sql
 /*bb
-md = { type: markdown }
 yaml`
   destination: dataset.new_table
   append: false
