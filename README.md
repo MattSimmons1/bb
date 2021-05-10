@@ -86,7 +86,8 @@ These can't be used as units or modifiers
 
 | Unit  | Example | Meaning  |
 |-------|---------|----------|
-| json  | ```json`{"foo": [1, 2, 3]}```` => `{"foo": [1, 2, 3]}` | The value is parsed as JSON |
+| json  | ```json`{"foo": [1, 2, 3]}` ``` | The value is parsed as JSON |
+| yaml  | ```yaml`foo: bar` ```           | The value is parsed as YAML |
 
 
 ### Imported Types
