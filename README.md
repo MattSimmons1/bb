@@ -58,10 +58,10 @@ $ bb my_data.bb.txt
 |quantity      | ∆ = { }<br>3∆    | `{ "quantity": 3 }` |
 |numeric value | ∆ = { }<br>∆5    | `{ "value": 5 }` |
 |string value  | ∆ = { }<br>∆\`foo`    | `{ "value": "foo" }` |
-|numeric prop  | ∆ = { foo: 100 }<br>∆    |` { "foo": 100 }`   |
+|numeric prop  | ∆ = { foo: 100 }<br>∆    | `{ "foo": 100 }`  |
 |string prop   | ∆ = { foo: bar }<br>∆    | `{ "foo": "bar" }` |
-|modifier          | ∆ = { $: foo }<br>∆$1        | `{ "foo": 1 }`          |
-|repeated modifier | ∆ = { $: foo }<br>∆$3$\`bar` | `{ "foo": [3, "bar"] }` |
+|modifier          | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
+|repeated modifier | ∆ = { +: foo }<br>∆+3+\`bar` | `{ "foo": [3, "bar"] }` |
 |script prop       | ∆ = { foo: d => 2 * 2 }<br>∆ | `{ "foo": 4 }`          |
 
 ### Reserved Characters, Key Words, and Other Syntax
@@ -84,15 +84,18 @@ These can't be used as units or modifiers
 
 ### Pre-Defined Types
 
-| Unit  | Example | Meaning  |
-|-------|---------|----------|
-| json  | ```json`{"foo": [1, 2, 3]}` ``` | The value is parsed as JSON |
-| yaml  | ```yaml`foo: bar` ```           | The value is parsed as YAML |
+The following types are pre-defined. some behave differently: 
+
+| Unit  | Example | Behaviour  |
+|-------|---------|------------|
+| md    | ```md`hello` ```                | normal - represents markdown |
+| json  | ```json`{"foo": [1, 2, 3]}` ``` | value is converted to JSON |
+| yaml  | ```yaml`foo: bar` ```           | value is converted to YAML |
 
 
 ### Imported Types
 
-Commonly used types can be optionally imported so that they don't need to be defined. For example:
+Commonly used types can be imported so that they don't need to be defined. For example:
 
 ```text
 // import currency
@@ -117,12 +120,14 @@ Any comment starting with bb is captured by the parser. For example:
 
 ```sql
 /*bb
-md = { type: markdown }
+yaml`
+  destination: dataset.new_table
+  append: false
+`
 md`# My Amazing Query`
-json`{"destination": "dataset.new_table", "append": false}`
 */
 
---bb md`Step 1: select all bars`
+--bb md`Step 1: Select all bars`
 SELECT * FROM dataset.table
 WHERE foo = 'bar'
 ```
@@ -131,6 +136,16 @@ Then use `--injection-mode` or `-i` when converting to json:
 
 ```shell-session
 $ bb my-query.sql -i
+```
+
+This would return:
+
+```json
+[
+  {"destination": "dataset.new_table", "append": false},
+  {"type": "markdown", "value": "# My Amazing Query"},
+  {"type": "markdown", "value": "Step 1: Select all bars"}
+]
 ```
 
 ### Examples
