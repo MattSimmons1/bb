@@ -43,6 +43,7 @@ func (l *lexer) injectionModeRun() {
 <!--bb ... -->
 """bb ... """
 '''bb ... '''
+```bb ... ```
 {-bb ... -}
 
 
@@ -59,23 +60,40 @@ func lexInjection(l *lexer) stateFn {
     return nil
   case r == '/':
       if len(l.input[l.pos:]) > 2 {
-
-        log("is '/" + l.input[l.pos:l.pos+3] + "' injected bb?")
         if l.input[l.pos:l.pos+3] == "/bb" {
-          log("yes")
           l.pos += 3
           l.ignore()
           return lexInlineInjection
         } else if l.input[l.pos:l.pos+3] == "*bb" {
-          log("yes")
           l.pos += 3
           l.ignore()
           return lexMultilineInjection
         }
       }
 
-      log("no")
       return lexInjection
+
+  case r == '-':
+    if len(l.input[l.pos:]) > 2 {
+      if l.input[l.pos:l.pos+3] == "-bb" {
+        l.pos += 3
+        l.ignore()
+        return lexInlineInjection
+      }
+    }
+
+    return lexInjection
+
+  case r == '#':
+    if len(l.input[l.pos:]) > 1 {
+      if l.input[l.pos:l.pos+2] == "bb" {
+        l.pos += 2
+        l.ignore()
+        return lexInlineInjection
+      }
+    }
+
+    return lexInjection
 
   default:
     return lexInjection
