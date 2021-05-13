@@ -43,6 +43,7 @@ func (l *lexer) injectionModeRun() {
 <!--bb ... -->
 """bb ... """
 '''bb ... '''
+```bb ... ```
 {-bb ... -}
 
 
