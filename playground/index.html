@@ -48,10 +48,12 @@
 <p>Write some bb in the box below:</p>
 <div class="main">
 	<div class="input"><textarea id="bbInput" name="bbInput" rows="14" cols="80" onchange="convert();">
+// type definitions
 a = { type: apple, price: d => "$" + (d.quantity * 0.50).toFixed(2) }
-b = { type: banana, *: colour }
+b = { type: banana, *: isGreen, !: isEaten }
 
-9a b*`yellow` 4b*`green`
+// data
+6a b* 4b! 2b 7a
 </textarea>
 	</div>
 	<p>JSON Output</p>
