@@ -1,21 +1,22 @@
 
 # bb
 
-Pictographic programming language. Designed to make data entry super quick and easy!
+Pictographic programming language. Designed to make metadata injection and data entry super quick and easy!
 
-Define your own types and the syntax for them! For example, the following bb:
+Define your own types and the syntax for them! Then bb converts them to JSON. For example:
 
-    a = { type: apples }
-    b = { type: bananas, colour: yellow }
+    a = { type: apple, ': isRed }  // this is a type definion
     
-    20a 57b
-    
-Is interpreted as:
+    a 4a a' a`foo`  // this is data
+
+Is converted to:
 
 ```json
 [
-    { "type": "apple", "quantity": 20 },
-    { "type": "banana", "colour": "yellow", "quantity": 57 }
+    { "type": "apple" },
+    { "type": "apple", "quantity": 4 },
+    { "type": "apple", "isRed": true },
+    { "type": "apple", "value": "foo" }
 ] 
 ```
 
@@ -50,19 +51,19 @@ $ bb my_data.bb.txt
 
 | Syntax      | Usage | Result    |
 |-------------|-------|-----------|
-|number       | 12    | `12`        | 
-|string       | foo    | `"foo"`        | 
-|safe string  | "foo" or \`foo`   | `"foo"`      | 
-|array        | 1 2 "foo"    | `[1, 2, "foo"]` |
-|user defined type | ∆ = { }<br>∆ | `{}` | 
-|quantity      | ∆ = { }<br>3∆    | `{ "quantity": 3 }` |
-|numeric value | ∆ = { }<br>∆5    | `{ "value": 5 }` |
-|string value  | ∆ = { }<br>∆\`foo`    | `{ "value": "foo" }` |
-|numeric prop  | ∆ = { foo: 100 }<br>∆    | `{ "foo": 100 }`  |
-|string prop   | ∆ = { foo: bar }<br>∆    | `{ "foo": "bar" }` |
-|modifier          | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
-|repeated modifier | ∆ = { +: foo }<br>∆+3+\`bar` | `{ "foo": [3, "bar"] }` |
-|script prop       | ∆ = { foo: d => 2 * 2 }<br>∆ | `{ "foo": 4 }`          |
+| number       | 12    | `12`        | 
+| string       | foo    | `"foo"`        | 
+| safe string  | "foo" or \`foo`   | `"foo"`      | 
+| array        | 1 2 "foo"    | `[1, 2, "foo"]` |
+| user defined type | ∆ = { }<br>∆ | `{}` | 
+| quantity      | ∆ = { }<br>3∆    | `{ "quantity": 3 }` |
+| numeric value | ∆ = { }<br>∆5    | `{ "value": 5 }` |
+| string value  | ∆ = { }<br>∆\`foo`    | `{ "value": "foo" }` |
+| numeric prop  | ∆ = { foo: 100 }<br>∆    | `{ "foo": 100 }`  |
+| string prop   | ∆ = { foo: bar }<br>∆    | `{ "foo": "bar" }` |
+| modifier          | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
+| repeated modifier | ∆ = { +: foo }<br>∆+3+\`bar` | `{ "foo": [3, "bar"] }` |
+| script prop       | ∆ = { foo: d => 2 * 2 }<br>∆ | `{ "foo": 4 }`          |
 
 ### Reserved Characters, Key Words, and Other Syntax
 
