@@ -67,9 +67,8 @@ func NewUDTFromDefinition(definition string) {
       log("INVALID PROPS")
       continue
     }
-    p[0] = strings.TrimSpace(p[0])
+    p[0] = removeQuotes(strings.TrimSpace(p[0]))
     p[1] = strings.TrimSpace(p[1])
-    // TODO: remove quotes around prop names
 
     if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
       log("numerical prop: " + p[0])
@@ -77,13 +76,16 @@ func NewUDTFromDefinition(definition string) {
     } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
       log("script prop: " + p[0] + ", with value: " + p[1])
       functionStart := strings.Index(p[1], "=>")
-      // we must re-write as a normal function because we can only run ES5 syntax 
+      // we must re-write as a normal function because we can only run ES5 syntax
+      // TODO: check if function is written in a block
+      //if strings.Contains(p[1][functionStart+2:], "return") {
+      //  function =
+      //}
       function := "function f(" + p[1][:functionStart] + "){ return " + p[1][functionStart+2:] + "};"
       log(function)
       scriptProps[p[0]] = function
     } else {
       log("string prop: " + p[0])
-      // TODO: remove quotes
       stringProps[p[0]] = removeQuotes(p[1])
     }
   }
@@ -175,7 +177,7 @@ func (t *udt) Parse(s string) map[string]interface{} {
       }
     }
     if isModifierChar(rune(k[0])) {
-      continue LoopStringProps  // skip props that start with standard modifier chars TODO: or give them null value?
+      continue LoopStringProps  // skip props that start with standard modifier chars
     }
     data[k] = v
   }
@@ -191,15 +193,16 @@ func (t *udt) addModifierToData(data map[string]interface{}, modifier string, va
   t.HiddenProps = append(t.HiddenProps, modifier)
   modifierName := t.StringProps[modifier]
   appendValue := false
+  valueIsBool := false
 
   if value == "" {
-    value = "1"
+    valueIsBool =  true
   }
 
   // remove quotes
   value = removeQuotes(value)
 
-  if data[modifierName] != nil {
+  if data[modifierName] != nil {  // determine if there is already a value for this modifier - if so then append
     if data[modifierName] == "" {  // TODO: why does this happen?
       // don't append
     } else {
@@ -209,7 +212,13 @@ func (t *udt) addModifierToData(data map[string]interface{}, modifier string, va
       }
     }
   }
-  if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
+  if valueIsBool {
+    if appendValue {
+      data[modifierName] = append(data[modifierName].([]interface{}), true)
+    } else {
+      data[modifierName] = true
+    }
+  } else if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
     if appendValue {
       data[modifierName] = append(data[modifierName].([]interface{}), number)
     } else {

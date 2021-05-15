@@ -9,6 +9,9 @@ import (
 )
 
 func removeQuotes(s string) string {
+	if len(s) == 0 {
+		return s
+	}
 	if quoteChar := s[:1]; quoteChar == `"` || quoteChar == "`" {
 		if s[len(s)-1:] == quoteChar {
 			return s[1:len(s)-1]
