@@ -52,14 +52,15 @@ if err := func() (rootCmd *cobra.Command) {
   var IsDebug bool
   var IsVerbose bool
   var isInjectionMode bool
+  var definitionsFile string
 
   rootCmd = &cobra.Command{
     Use: "bb",
-    Short: "bb command line tools",
+    Short: "bb - pictographic programming language\nhttps://mattsimmons1.github.io/bb/",
     Args: cobra.ArbitraryArgs,
     Run: func(c *cobra.Command, args []string){
       if len(args) < 1 {
-        fmt.Println("bb command line tools.\nUsage:\n  bb <input>\nUse \"bb --help\" for more information.")
+        fmt.Println("bb - pictographic programming language\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
         return
       }
       input := ""
@@ -71,6 +72,15 @@ if err := func() (rootCmd *cobra.Command) {
       } else {
         input = args[0]
       }
+
+      // try to open definitions as a file - preppend to the input
+      definitionsData, err := ioutil.ReadFile(definitionsFile)
+      if err == nil {
+        input = string(definitionsData) + "\n" + input
+      } else {
+        input = definitionsFile + "\n" + input
+      }
+
       if IsVerbose {
         parser.SetVerbose()
       }
@@ -88,17 +98,32 @@ if err := func() (rootCmd *cobra.Command) {
       return
     },
   }
+
+  rootCmd.AddCommand(func() (createCmd *cobra.Command) {
+    createCmd = &cobra.Command{
+      Use:   "version",
+      Short: "print the version number",
+      Run: func(c *cobra.Command, args []string){
+        fmt.Println("v0.1.0")
+      },
+    }
+    return
+  }())
+
   rootCmd.PersistentFlags().BoolVarP(&IsVerbose, "verbose", "v", false,
     "show detailed logs from the bb lexer and parser")
 
-  rootCmd.PersistentFlags().BoolVarP(&IsPreview, "preview", "p", false,
+  rootCmd.Flags().BoolVarP(&IsPreview, "preview", "p", false,
     "view the interpretation of the input without converting")
 
-  rootCmd.PersistentFlags().BoolVarP(&IsDebug, "debug", "d", false,
-    "show each step of the parsing process")
+  rootCmd.Flags().BoolVarP(&IsDebug, "explain", "e", false,
+    "list every value found in the input along with the type and value when converted to JSON")
 
-  rootCmd.PersistentFlags().BoolVarP(&isInjectionMode, "injection-mode", "i", false,
-    "convert bb found in the comment strings of another language")
+  rootCmd.Flags().BoolVarP(&isInjectionMode, "injection-mode", "i", false,
+    "convert bb within comment strings of another language")
+
+  rootCmd.Flags().StringVarP(&definitionsFile, "definitions", "d", "",
+    "string or file path for additional type definitions to be used when parsing")
 
   return
   }().Execute(); err != nil {

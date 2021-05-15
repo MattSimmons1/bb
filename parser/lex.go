@@ -75,7 +75,7 @@ var itemNames = []string{
 const eof = -1
 
 const (
-	modifiers     = "+~<>:;/|#&≠≥≤^"  // all potential modifiers
+	modifiers     = "+~<>:;/|#&≠≥≤^*$£,?!•°·"  // all standard modifiers
 	quotes        = "`\""
 )
 
@@ -633,7 +633,6 @@ func (l *lexer) scanModifier() bool {
 								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
 								rawModifiers = append(rawModifiers, [2]string{ m2, l.input[modifierStart+Pos(len(m2)):l.pos] })  // store the modifier and value we've found
 								// keep going - onto the next modifier
-								//l.next()
 								modifierStart = l.pos
 								continue Loop
 							}
@@ -738,9 +737,8 @@ Loop:
 	return lexBb
 }
 
-//
+// only used for seeing if a prop should be included in the output - standard modifier chars are not
 func isModifierChar(r rune) bool {
-	log("is " + string(r) + " a modifier?")
 	return strings.ContainsRune(modifiers, r)
 }
 

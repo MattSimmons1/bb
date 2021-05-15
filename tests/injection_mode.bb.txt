@@ -20,3 +20,25 @@ console.log("cooleh wooleh")
 
 --b ignore
 #
+
+"""bb
+comment string multiline
+"""
+
+```bb
+wow
+```
+
+'''bb
+wow
+'''
+
+{-bb
+wow
+-}
+
+<!--bb
+∆ wow
+-->
+
+/
