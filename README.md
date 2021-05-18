@@ -1,5 +1,5 @@
 
-# bb
+![bb logo](./playground/logo.svg)
 
 Pictographic programming language. Designed to make metadata injection and data entry super quick and easy!
 
