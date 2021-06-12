@@ -1,0 +1,49 @@
+
+import subprocess
+import json
+from typing import Any
+import os
+
+here = os.path.abspath(os.path.dirname(__file__))
+
+
+class BBDecodeError(Exception):
+    def __init__(self, message="Input is not valid bb."):
+        self.message = message
+        super().__init__(self.message)
+
+
+def convert(input: str, definitions: str = None, injection_mode: bool = False) -> Any:
+    """Convert bb syntax to a json object.
+
+    :param input: bb string or file path.
+    :param definitions: bb string or file path containing type definitions to use.
+    :param injection_mode: If true, only bb found within comments will be parsed. Same as using bb.extract().
+    :return: List of JSON objects representing the input.
+    """
+    cmd = [f"{here}/bb", input]
+
+    if definitions is not None:
+        cmd.append("-d")
+        cmd.append(definitions)
+
+    if injection_mode:
+        cmd.append("-i")
+
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    res = "\n".join(iter(p.stdout.readline, ""))
+    if res == "":
+        raise BBDecodeError
+    res = json.loads(res)
+    return res
+
+
+def extract(input: str, definitions: str = None) -> Any:
+    """Extract injected bb from within the comments of another language.
+
+    :param input: bb string or file path.
+    :param definitions: bb string or file path containing type definitions to use.
+    :return: List of JSON objects representing the input.
+    """
+    return convert(input, definitions=definitions, injection_mode=True)
+
