@@ -47,3 +47,8 @@ def extract(input: str, definitions: str = None) -> Any:
     """
     return convert(input, definitions=definitions, injection_mode=True)
 
+
+if __name__ == '__main__':  # unit tests
+
+    assert convert("hello") == ['hello']
+    assert convert("3.4∆", definitions="∆ = { cooleh: fooleh }") == {'cooleh': 'fooleh', 'quantity': 3.4}
