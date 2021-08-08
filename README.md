@@ -30,6 +30,8 @@ If you have go installed you can build the binary yourself and install with:
 go get github.com/MattSimmons1/bb
 ```
 
+If you don't have go installed, download the binary from the [releases page](https://github.com/MattSimmons1/bb/releases) and save to a location on your PATH.
+
 ### Usage
 
 ```shell-session

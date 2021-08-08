@@ -104,7 +104,7 @@ if err := func() (rootCmd *cobra.Command) {
       Use:   "version",
       Short: "print the version number",
       Run: func(c *cobra.Command, args []string){
-        fmt.Println("v0.1.0")
+        fmt.Println("v0.2.0")
       },
     }
     return
