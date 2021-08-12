@@ -24,13 +24,13 @@ Try it out in your browser with the [**bb playground**](https://mattsimmons1.git
 
 ### Install
 
-If you have go installed you can build the binary yourself and install with:
+If you have [go](https://golang.org/doc/install) installed you can build the binary yourself and install with:
 
 ```bash
 go get github.com/MattSimmons1/bb
 ```
 
-If you don't have go installed, download the binary from the [releases page](https://github.com/MattSimmons1/bb/releases) and save to a location on your PATH.
+Alternatively, download the binary from the [releases page](https://github.com/MattSimmons1/bb/releases) and save to a location on your PATH.
 
 ### Usage
 
