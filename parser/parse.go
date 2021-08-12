@@ -50,7 +50,7 @@ func Parse(input string) []interface{} {
 		} else if item.typ == itemUDT {
 			row = append(row, ParseUDT(item.val))
 		} else {
-			// TODO
+			// definitions, comments, and spaces are ignored
 		}
 	}
 
@@ -98,6 +98,15 @@ func Debug(input string) {
 		case itemDefinition:
 			value = item.val
 			typeName = "\nDefinition"
+		case itemAssignment:
+			value = item.val
+			typeName = "\nAssignment"
+		case itemPropName:
+			value = item.val
+			typeName = "\nPropName"
+		case itemPropValue:
+			value = item.val
+			typeName = "\nPropValue"
 		case itemBool:
 			value = item.val
 			typeName = "\nBool"

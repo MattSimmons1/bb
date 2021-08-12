@@ -45,32 +45,20 @@ const (
 	itemBool                         // boolean constant
 	itemNull                         // JSON null
 	itemEOF
-	itemNumber     // simple number, including imaginary
-	itemPipe       // pipe symbol
-	itemSpace      // run of spaces separating arguments
-	itemString     // quoted string (includes quotes)
-	itemKeyword  // used only to delimit the keywords
-	itemUDT      // user defined type
-	itemTab      // two or more spaces or a tab
+	itemNumber      // simple number, including imaginary
+	itemPipe        // pipe symbol
+	itemSpace       // run of spaces separating arguments
+	itemString      // quoted string (includes quotes)
+	itemKeyword     // used only to delimit the keywords
+	itemUDT         // user defined type
+	itemTab         // two or more spaces or a tab
 	itemDefinition  // type definition, e.g. ∆ = { unit: pizza }
-	itemNewline  // \n
+	itemNewline     // \n
+	itemAssignment
+	itemPropName
+	itemPropValue
+	itemComment     // inline or multiline comment
 )
-
-var itemNames = []string{
-"itemError",
-"Bool",         // boolean constant
-"Null",         // JSON null
-"EOF",
-"Number",     // simple number, including imaginary
-"Pipe",       // pipe symbol
-"space",      // run of spaces separating arguments
-"String",    // quoted string (includes quotes)
-"Keyword", // used only to delimit the keywords
-"UDT",      // user defined type
-"tab",      // two or more spaces or a tab
-"definition",
-"Newline",  // \n
-}
 
 const eof = -1
 
@@ -236,7 +224,7 @@ func lexComment(l *lexer) stateFn {
 		return l.errorf("unclosed comment")
 	}
 	l.pos += Pos(i + len(rightComment))
-	l.ignore()
+	l.emit(itemComment)
 	return lexBb
 }
 
@@ -251,7 +239,7 @@ func lexInlineComment(l *lexer) stateFn {
 		defineImportedTypes(strings.ToLower(splitComment[1]))
 	}
 	l.pos += Pos(i)
-	l.ignore()
+	l.emit(itemComment)
 	return lexBb
 }
 
@@ -311,9 +299,8 @@ func lexSpace(l *lexer) stateFn {
 			numSpaces++
 		} else if r == '\n' {
 			log("found newline")
-			l.emit(itemNewline)
 			l.acceptRun(" ")  // ignore whitespace at start of next line
-			l.ignore()
+			l.emit(itemNewline)
 			return lexBb
 		} else {
 		  numSpaces+=2  // tabs count as 2 spaces
@@ -364,34 +351,127 @@ Loop:
 	return lexBb
 }
 
-// '∆ =' has already been consumed
+// lex and parse at the same time - '∆ =' has already been consumed
 func lexDefinition(l *lexer) stateFn {
 	log("lexDefinition")
+	unit := strings.TrimSpace(l.input[l.start:l.pos-1])
+
 	l.acceptRun(" ")
+
 	if !l.accept("{") {
 		l.errorf("Invalid assignment, expected '{")
 	}
-	// look-ahead for } before the next newline
+
+	l.emit(itemAssignment)  // ignored by the parser, for syntax highlighting only
+
+	props := make(map[string]string)
+
 Loop:
 	for {
 		switch l.next() {
-		case '\n', eof:
-			return l.errorf("Expected '}' at the end of type definition")  // TODO: more helpful error message
-		case '\\':
-			l.accept("}")
+		case eof:
+			return l.errorf("Expected '}' at the end of type definition") // TODO: more helpful error message
+		//case '\\':
+		//	l.accept("}")
 		case '}':
+			break Loop
+
+		case ',':
+			l.emit(itemAssignment)  // just ',', ignored by the parser, for syntax highlighting only
+
+		case ' ', '\n':
+			// absorb
+
+		case '/':
+			if l.peek() == '/' {
+				// TODO: allow inline comments
+
+			} else if l.peek() == '*' {
+				//lexComment()
+				// TODO: allow multiline comments
+			}
+		default:
+			err, propName, propValue := l.scanProp()
+			if err != nil {
+				return err
+			}
+			props[propName] = propValue
+
+		}
+	}
+
+	l.emit(itemAssignment)  // just '}', ignored by the parser, for syntax highlighting only
+
+
+	// special logic: add the definition to the global map of UDTs now - lex it properly later
+	//definitionValue := l.input[l.start:l.pos]
+	NewUDTFromDefinition(unit, props)
+
+	//l.emit(itemDefinition)
+
+  return lexBb
+}
+
+// Extract the prop name and value. Ignores quotes and spaces.
+func (l *lexer) scanProp() (stateFn, string, string) {
+	log("scanProp")
+
+	start := l.pos - 1
+	propName := ""
+	propValue := ""
+
+Loop:
+	// look for an unescaped ':' to end of the prop name
+	for {
+		switch l.next() {
+		case eof, '}':
+			return l.errorf("Expected ':' at the end of prop name"), "", ""
+		case '\\':
+			l.accept("}:")
+		case ':':
+			l.backup()
+			if start == l.pos {
+				return l.errorf("Prop name cannot be empty"), "", ""
+			}
+			propName = l.input[start:l.pos]
 			break Loop
 		}
 	}
 
-	// special logic: add the definition to the global map of UDTs now - lex it properly later
-	definitionValue := l.input[l.start:l.pos]
-	NewUDTFromDefinition(definitionValue)
+	l.emit(itemPropName)  // ignored by the parser, for syntax highlighting only
 
-	l.emit(itemDefinition)
+	l.accept(":")
+	l.emit(itemAssignment)  // just ':', ignored by the parser, for syntax highlighting only
 
-  return lexBb
+	l.acceptRun(" \n")
+	// TODO: allow comments between name and value
+
+	start = l.pos
+
+Loop2:
+	// look for an unescaped ',' or '}' to end of the prop value
+	for {
+		switch l.next() {
+		case eof:
+			return l.errorf("Expected '}' at the end of definition"), "", ""
+		case '\\':
+			l.accept("},")
+		case '{':  // possible js code block
+			// ignore - TODO: parse JS, allow commas
+		case ',', '}':
+			l.backup()
+			if start == l.pos {
+				return l.errorf("Prop value cannot be empty"), "", ""
+			}
+			propValue = l.input[start:l.pos]
+			break Loop2
+		}
+	}
+	l.emit(itemPropValue)  // ignored by the parser, for syntax highlighting only
+
+	return nil, propName, propValue
 }
+
 
 // atTerminator reports whether the input is at valid termination character to
 // appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
@@ -768,26 +848,43 @@ func isAlphaNumeric(r rune) bool {
 
 func Preview(input string) {
 	l := lex(input)
-
+	idx := 0  // keep track of which udt we're looking at
 	for item := range l.items {
 
-		colour := ""
+		colour := ""  // https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
 		if item.typ == itemUDT {
-			colour = "94"
+			colour = "37"
+
 		} else if item.typ == itemString {
 			colour = "92"
 		} else if item.typ == itemNumber {
 			colour = "96"
-		} else if item.typ == itemDefinition {
-			colour = "90"
+		} else if item.typ == itemAssignment {
+			colour = "30"
+		} else if item.typ == itemPropName {
+			colour = "32"
+		} else if item.typ == itemPropValue {
+			colour = "34"
 		} else if item.typ == itemBool {
 			colour = "95"
 		} else if item.typ == itemNull {
 			colour = "95"
 		} else if item.typ == itemError {
 			colour = "91"
+		} else if item.typ == itemComment {
+			colour = "90"
 		}
 
-		fmt.Print("\033[", colour, "m", item.val, "\033[0m")
+		if item.typ == itemUDT {
+
+			unit := INSTANCES[idx]
+			idx += 1
+			halves := strings.SplitN(item.val, unit, 2)  // split into quantity and everything else
+
+			fmt.Print("\033[", colour, "m", halves[0], "\033[1m", "\033[94m", unit, "\033[0m", "\033[", colour, "m", halves[1], "\033[0m")
+
+		} else {
+		  fmt.Print("\033[", colour, "m", item.val, "\033[0m")
+		}
 	}
 }

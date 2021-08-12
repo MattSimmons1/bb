@@ -74,7 +74,7 @@ if err := func() (rootCmd *cobra.Command) {
         input = args[0]
       }
 
-      // try to open definitions as a file - preppend to the input
+      // try to open definitions as a file - prepend to the input
       definitionsData, err := ioutil.ReadFile(definitionsFile)
       if err == nil {
         input = string(definitionsData) + "\n" + input
@@ -132,18 +132,3 @@ if err := func() (rootCmd *cobra.Command) {
     log.Panicln(err)
   }
 }
-
-/*
-
-To Do
-MVP
-- [x] anything can be a modifier
-- [ ] Invalid DTs should become strings? strict mode?
-- [ ] rows should become an array of arrays
-v1.0.0
-- [ ] json PDT
-- [ ] yaml PDT
-- [ ] structures/arrays
-- [ ] allow single - and . as UDTs or Modifiers
-- [ ] safe mode / strict mode
-*/
