@@ -371,26 +371,22 @@ Loop:
 		switch l.next() {
 		case eof:
 			return l.errorf("Expected '}' at the end of type definition") // TODO: more helpful error message
-		//case '\\':
-		//	l.accept("}")
 		case '}':
 			break Loop
-
 		case ',':
 			l.emit(itemAssignment)  // just ',', ignored by the parser, for syntax highlighting only
-
 		case ' ', '\n':
 			// absorb
-
-		case '/':
+		case '/':  // deal with comments
 			if l.peek() == '/' {
-				// TODO: allow inline comments
-
+				l.backup()
+				lexInlineComment(l)
 			} else if l.peek() == '*' {
-				//lexComment()
-				// TODO: allow multiline comments
+				l.backup()
+				lexComment(l)
 			}
 		default:
+			l.backup()
 			err, propName, propValue := l.scanProp()
 			if err != nil {
 				return err
@@ -419,13 +415,19 @@ func (l *lexer) scanProp() (stateFn, string, string) {
 	start := l.pos - 1
 	propName := ""
 	propValue := ""
-
+  // TODO: allow commas in quoted value
 Loop:
 	// look for an unescaped ':' to end of the prop name
 	for {
-		switch l.next() {
+		switch r := l.next(); r {
 		case eof, '}':
 			return l.errorf("Expected ':' at the end of prop name"), "", ""
+		case '"', '`':
+			err := l.scanQuotedString(r)
+			log("finished scanning quoted string, " + string(l.peek()) + " is next.")
+			if err != nil {
+				return err, "", ""
+			}
 		case '\\':
 			l.accept("}:")
 		case ':':
@@ -444,20 +446,36 @@ Loop:
 	l.emit(itemAssignment)  // just ':', ignored by the parser, for syntax highlighting only
 
 	l.acceptRun(" \n")
-	// TODO: allow comments between name and value
+
+	// allow comments between name and value
+	if l.peek() == '/' {
+		if l.peek() == '/' {
+			lexInlineComment(l)
+		} else if l.peek() == '*' {
+			lexComment(l)
+		}
+	}
 
 	start = l.pos
 
 Loop2:
 	// look for an unescaped ',' or '}' to end of the prop value
 	for {
-		switch l.next() {
+		switch r := l.next(); r {
 		case eof:
 			return l.errorf("Expected '}' at the end of definition"), "", ""
+		case '"', '`':
+			err := l.scanQuotedString(r)
+			if err != nil {
+				return err, "", ""
+			}
 		case '\\':
 			l.accept("},")
 		case '{':  // possible js code block
-			// ignore - TODO: parse JS, allow commas
+			err := l.scanJavaScript()
+			if err != nil {
+				return err, "", ""
+			}
 		case ',', '}':
 			l.backup()
 			if start == l.pos {
@@ -472,6 +490,58 @@ Loop2:
 	return nil, propName, propValue
 }
 
+// scans a js code block following '{'
+func (l *lexer) scanJavaScript() stateFn {
+	log("scanJavaScript")
+
+Loop:
+	// look for an unescaped '}' to end of the prop name
+	for {
+		switch r := l.next(); r {
+		case eof:
+			return l.errorf("Expected '}' at the end of JavaScript")
+		case '{':
+			err := l.scanJavaScript()  // recurse
+			if err != nil {
+				return err
+			}
+		case '"', '\'', '`':  // don't end for } in string
+			err := l.scanQuotedString(r)
+			if err != nil {
+				return err
+			}
+		case '}':
+			break Loop
+		}
+	}
+	return nil
+}
+
+func (l *lexer) scanQuotedString(quoteChar rune) stateFn {
+	log("scanQuotedString")
+	log("started scanning quoted string, " + string(l.peek()) + " is next.")
+
+Loop:
+	for {
+		switch l.next() {
+		case eof:
+			return l.errorf("Expected '" + string(quoteChar) + "', found EOF")
+			// absorb
+		case '\\':
+			if l.next() == quoteChar {
+				// absorb escaped quote
+				log("found escaped quote")
+			} else {
+				log("found stray backslash")
+				l.backup()  // backslash is absorbed
+			}
+		case quoteChar:
+			break Loop
+		}
+
+	}
+  return nil
+}
 
 // atTerminator reports whether the input is at valid termination character to
 // appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
@@ -578,7 +648,7 @@ Loop:
 
   // now we have the full word we need to make sure it's not a definition or key word
 	// look-ahead for assignment
-	l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
+	l.acceptRun(" ")
 	if l.accept("=") {
 	  l.pos = start  // backtrack
 		return false
