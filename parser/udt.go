@@ -24,69 +24,44 @@ func NewUDT(unit string, numericalProps map[string]float64, stringProps map[stri
                isSpecial: false }
 }
 
-// take a definition like "∆ = { "unit": "pizza slices", "+": "topping" }" and add to global map
-func NewUDTFromDefinition(definition string) {
-  log("Define new UDT with " + definition)
-
-  // extract just the unit
-  i := strings.Index(definition, "=")
-  unit := strings.TrimSpace(definition[:i])
-  log("unit is " + unit)
-  definition = definition[i:]
-
-  for {  // remove leading spaces, '=', and '{'
-    if definition[0] == ' ' || definition[0] == '=' || definition[0] == '{' {
-      definition = definition[1:]
-    } else {
-      break
-    }
-  }
-
-  for {  // remove trailing spaces and '}'
-    l := len(definition) - 1
-    if l == -1 {
-      break  // definition is nil
-    } else if definition[l] == ' ' || definition[l] == '}' {
-      definition = definition[:l]
-    } else {
-      break
-    }
-  }
+// create UDT and add to global map
+func NewUDTFromDefinition(unit string, props map[string]string) {
+  log("Define new UDT with unit " + unit)
 
   numericalProps := map[string]float64{}
   stringProps := map[string]string{}
   scriptProps := map[string]string{}
 
-  // TODO: allow commas in strings!
-  // split definition into props
-  props := strings.Split(definition, ",")
+  for propName, propValue := range props {
 
-  for _, prop := range props {
-    p := strings.SplitN(prop, ":", 2)
-    if len(p) < 2 {
-      log("INVALID PROPS")
-      continue
-    }
-    p[0] = removeQuotes(strings.TrimSpace(p[0]))
-    p[1] = strings.TrimSpace(p[1])
+    propName = removeQuotes(strings.TrimSpace(propName))
+    propName = strings.ReplaceAll(propName, "\\:", ":")  // unescape :
+    propName = strings.ReplaceAll(propName, "\\}", "}")  // unescape }
 
-    if number, err := strconv.ParseFloat(p[1], 64); err == nil {  // if value is valid number
-      log("numerical prop: " + p[0])
-      numericalProps[p[0]] = number
-    } else if strings.Contains(p[1], "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
-      log("script prop: " + p[0] + ", with value: " + p[1])
-      functionStart := strings.Index(p[1], "=>")
+    propValue = removeQuotes(strings.TrimSpace(propValue))
+    propValue = strings.ReplaceAll(propValue, "\\,", ",")  // unescape ,
+    propValue = strings.ReplaceAll(propValue, "\\}", "}")  // unescape }
+
+    log("found prop '" + propName + "' with value '" + propValue + "'")
+
+    if number, err := strconv.ParseFloat(propValue, 64); err == nil {  // if value is valid number
+      log("numerical prop: " + propName)
+      numericalProps[propName] = number
+    } else if strings.Contains(propValue, "=>") {  // if value is an arrow function - TODO: check for single left hand argument and don't match strings that contain => but aren't functions
+      log("script prop: " + propName + ", with value: " + propValue)
+      functionStart := strings.Index(propValue, "=>")
       // we must re-write as a normal function because we can only run ES5 syntax
       // TODO: check if function is written in a block
       //if strings.Contains(p[1][functionStart+2:], "return") {
       //  function =
       //}
-      function := "function f(" + p[1][:functionStart] + "){ return " + p[1][functionStart+2:] + "};"
+      // TODO: check function arg is single word (user may have forgotten a comma, which will be hard to debug) - need useful error message
+      function := "function f(" + propValue[:functionStart] + "){ return " + propValue[functionStart+2:] + "};"
       log(function)
-      scriptProps[p[0]] = function
+      scriptProps[propName] = function
     } else {
-      log("string prop: " + p[0])
-      stringProps[p[0]] = removeQuotes(p[1])
+      log("string prop: " + propName)
+      stringProps[propName] = removeQuotes(propValue)
     }
   }
 
