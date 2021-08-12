@@ -60,7 +60,7 @@ if err := func() (rootCmd *cobra.Command) {
     Args: cobra.ArbitraryArgs,
     Run: func(c *cobra.Command, args []string){
       if len(args) < 1 {
-        fmt.Println("bb - pictographic programming language\nUsage:\n  bb <input>\nUse \"bb help\" for more information.")
+        fmt.Println("bb - pictographic programming language\nUsage:\n  bb [file path or string] [flags]\nUse \"bb help\" for more information.")
         return
       }
 
@@ -106,7 +106,7 @@ if err := func() (rootCmd *cobra.Command) {
       Use:   "version",
       Short: "print the version number",
       Run: func(c *cobra.Command, args []string){
-        fmt.Println("v0.2.0")
+        fmt.Println("v0.2.1")
       },
     }
     return
