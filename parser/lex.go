@@ -630,10 +630,12 @@ func (l *lexer) scanUnit() bool {
   word := ""
 
   // find the longest potential unit we can
+  // TODO: get the length of the longest unit (or PDT or key word) and only look up to this length to save time
 Loop:
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		//case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		case !isSpace(r):
 			log(string(r))
 			// absorb
 		default:
@@ -763,7 +765,8 @@ func (l *lexer) scanModifier() bool {
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
 		// then scan value
-		if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+		//if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+		if isSpace(r) {
 			// TODO: check for dot not followed by number or dash not followed by number or dot then number
 			// check it's a known modifier
 
@@ -816,6 +819,8 @@ func (l *lexer) scanModifier() bool {
 func (l *lexer) scanValue() bool {
 	log("scanValue")
 
+	start := l.pos
+
 	quoted := false
 	quoteChar := l.peek()
 	if quoteChar == '"' || quoteChar == '`' {
@@ -823,11 +828,11 @@ func (l *lexer) scanValue() bool {
 		l.next()
 	}
 
+	isDecimal := false
+
 Loop:
 	for {
 		switch r := l.next(); {
-		case isNumeric(r):
-			// absorb
 		case quoted && r == '\\':
 			if l.next() == quoteChar {
 				// absorb escaped quote
@@ -837,6 +842,19 @@ Loop:
 				l.backup()  // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != eof:
+			// absorb
+		case r == '-':
+			if l.pos != start + 1 {  // absorb but only at the start
+			  l.backup()
+				break Loop  // not a valid number but could be a modifier
+			}
+		case r == '.':
+			if isDecimal {
+        l.backup()
+        break Loop  // not a valid number but could be a modifier
+			}
+			isDecimal = true  // absorb but only once
+		case unicode.IsNumber(r):
 			// absorb
 		default:
 			if quoted {
@@ -849,6 +867,14 @@ Loop:
 			l.backup()
 			break Loop
 		}
+	}
+
+	if l.input[start:l.pos] == "-" || l.input[start:l.pos] == "." {
+		l.backup()  // check value is not invalid number - if so, remove it
+	}
+
+	if l.pos > start && l.input[l.pos-1:l.pos] == "." {  // don't allow numbers like '2.' as these could break modifiers starting with '.'
+		l.backup()  // remove decimal point
 	}
 
 	return true

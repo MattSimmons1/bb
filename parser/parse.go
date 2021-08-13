@@ -30,9 +30,10 @@ func Parse(input string) []interface{} {
 		if item.typ == itemNumber {
 			number, err := strconv.ParseFloat(item.val, 64)
 			if err != nil {
-				panic(err)
+				row = append(row, item.val)  // if number doesn't parse keep as string
+			} else {
+			  row = append(row, number)
 			}
-			row = append(row, number)
 		} else if item.typ == itemTab {
 			// todo
 		} else if item.typ == itemNewline {
