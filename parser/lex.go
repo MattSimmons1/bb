@@ -979,38 +979,40 @@ func Syntax(input string) map[string]interface{} {
 
 				halves := strings.SplitN(item.val, unit, 2)  // split into quantity and everything else
 				quantity := halves[0]
-				udt = append(udt, map[string]string{ "class": "quantity", "value": quantity })
-				udt = append(udt, map[string]string{ "class": "unit", "value": unit })
+				udt = append(udt, map[string]interface{}{ "class": "quantity", "value": quantity })
+				udt = append(udt, map[string]interface{}{ "class": "unit", "value": unit })
 				// TODO: split everything else into modifiers and values
 				if len(halves) > 1 {
-				  udt = append(udt, map[string]string{ "class": "value", "value": halves[1] })
+				  udt = append(udt, map[string]interface{}{ "class": "value", "value": halves[1] })
 				}
 				// TODO: modifiers
 				//for modifierUnit, modifierValue := range(modifiers) {
-			  //  output = append(output, map[string]string{ "class": "modifier modifier-" + modifierUnit + " modifierUnit", "value": modifierValue })
-			  //  output = append(output, map[string]string{ "class": "modifier modifier-" + modifierUnit + " modifierValue", "value": modifierValue })
+			  //  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierUnit", "value": modifierValue })
+			  //  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierValue", "value": modifierValue })
 		  	//}
 
 		  	output = append(output, map[string]interface{}{ "class": "UDT UDT-" + unit, "value": udt, "data": data })
 
 		  case itemString:
-				output = append(output, map[string]string{ "class": "string", "value": item.val })
+				output = append(output, map[string]interface{}{ "class": "string", "value": item.val })
 			case itemNumber:
-			  output = append(output, map[string]string{ "class": "number", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "number", "value": item.val })
 		  case itemAssignment:
-			  output = append(output, map[string]string{ "class": "assignment", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "assignment", "value": item.val })
 		  case itemPropName:
-			  output = append(output, map[string]string{ "class": "propName", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "propName", "value": item.val })
 		  case itemPropValue:
-			  output = append(output, map[string]string{ "class": "propValue", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "propValue", "value": item.val })
 		  case itemBool:
-			  output = append(output, map[string]string{ "class": "bool", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "bool", "value": item.val })
 		  case itemNull:
-			  output = append(output, map[string]string{ "class": "null", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "null", "value": item.val })
 		  case itemError:
-			  output = append(output, map[string]string{ "class": "error", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val })
 		  case itemComment:
-			  output = append(output, map[string]string{ "class": "comment", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "comment", "value": item.val })
+		  case itemEOF:
+			  // do nothing
 			default:
         output = append(output, item.val)
 		}
