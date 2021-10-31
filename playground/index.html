@@ -20,15 +20,37 @@
 	a {
 		color: #bebeee;
 	}
-	.main {
+	.editor {
+		position: relative;
+		height: 300px;
+		width: 700px;
 	}
-	#bbInput, #jsonOutput {
+
+	#bbInput, #jsonOutput, #highlighting {
 		color: #fff;
+		font-size: 15px;
     background: #111214;
 		border: none;
 		border-radius: 10px;
 		padding: 20px;
 		margin: 0;
+	}
+	#bbInput, #highlighting {
+		/* place textarea and highlighting over each other */
+		position: absolute;
+		top: 0;
+		left: 0;
+		/* allow scrolling */
+		height: 260px;
+		overflow: auto;
+		width: 660px;
+	}
+	#bbInput {
+		resize: none;
+		color: transparent;
+		white-space: nowrap;
+		background: transparent;
+		caret-color: white;
 	}
 	.input {
 		width: auto;
@@ -42,24 +64,80 @@
 		width: 700px;
 		max-height: 300px;
 		border-radius: 10px;
+		background: #bebeee;
 		overflow: scroll;
 	}
+
+  /* bb syntax highlighting */
+	.bb {
+	  color: white;
+	}
+	.bb .UDT .quantity {
+    color: #6194db
+	}
+	.bb .UDT .unit {
+		color: #cbccfb;
+		font-weight: bold;
+	}
+	.bb .UDT .value {
+		color: #bebeee;
+	}
+
+	.bb .comment {
+		color: grey;
+	}
+
+	.bb .number {
+		color: #4a82ac;
+	}
+
+	.bb .string {
+		color: #88b63f;
+	}
+
+	.bb .propName {
+		color: #e8cf76;
+	  /*font-weight: bold;*/
+	}
+
+
+	.bb .assignment {
+		color: #dab152;
+	}
+
+	.bb .bool {
+		color: #ff9ba8;
+	}
+	.bb .null {
+		color: #6482ff;
+	}
+
 </style>
 <h1><a href="../">bb</a> playground</h1>
 <p>Write some bb in the box below:</p>
-<div class="main">
-	<div class="input"><textarea id="bbInput" name="bbInput" rows="14" cols="80" onchange="convert();">
+<div class="editor">
+	<pre id="highlighting" aria-hidden="true">
+<code class="bb" id="highlighting-content">// type definitions
+a = { type: apple, price: d => "$" + (d.quantity * 0.50).toFixed(2) }
+b = { type: banana, *: isGreen, !: isEaten }
+
+// data
+6a b* 4b! 2b 7a 123 foo
+</code>
+	</pre>
+	<div class="input"><textarea id="bbInput" name="bbInput" spellcheck="false" onchange="convert(); sync_scroll(this);" onscroll="sync_scroll(this);">
 // type definitions
 a = { type: apple, price: d => "$" + (d.quantity * 0.50).toFixed(2) }
 b = { type: banana, *: isGreen, !: isEaten }
 
 // data
-6a b* 4b! 2b 7a
+6a b* 4b! 2b 7a 123 foo
+
 </textarea>
 	</div>
-	<p>JSON Output</p>
-  <div class="output"><pre id="jsonOutput"></pre></div>
 </div>
+<p>JSON Output</p>
+<div class="output"><pre id="jsonOutput"></pre></div>
 
 	<script src="js/wasm_exec.js"></script>
 	<script>
@@ -114,10 +192,73 @@ b = { type: banana, *: isGreen, !: isEaten }
 				console.error(err);
 			}).then(init);
 			output = "Syntax Error - bb couldn't parse the input.";
+			document.querySelector("#highlighting-content").innerHTML = input;
+		} else {
+			output = "[\n  " + output.map(d => JSON.stringify(d)).join(",\n  ") + "\n]";
+		  highlight(input)
 		}
 
-		document.getElementById("jsonOutput").innerText = JSON.stringify(output, null, 2);
+		document.getElementById("jsonOutput").innerText = output;
+	}
 
+	function highlight(input) {
+		const result_element = document.querySelector("#highlighting-content");
+		const documentFragment = document.createDocumentFragment();
+
+		// Handle final newlines (see article)
+		if(input[input.length-1] === "\n") {
+			input += " ";
+		}
+
+		const syntax = wasm.bbSyntax(input);
+
+		console.log("syntax", syntax)
+
+
+		syntax["items"].forEach(item => {
+  		if (typeof(item) === "string") {
+				documentFragment.appendChild(document.createTextNode(item))
+
+			} else if (typeof item === "object") {
+  			let element;
+				if (item.data) {
+					element = document.createElement(item.data.href ? "a" : "span");
+					element.setAttribute("class", item.data.class ?? item.class);
+					// TODO: allow mouse interaction
+					["style", "href", "onclick"].forEach(prop => {
+						if (item.data[prop]) {
+							element.setAttribute(prop, item.data[prop]);
+						}
+					});
+				} else {
+					element = document.createElement("span");
+					element.setAttribute("class", item.class);
+				}
+				if (Array.isArray(item.value)) {
+  		    item.value.forEach(childItem => {
+  		    	const childElement = document.createElement("span");
+  		    	childElement.setAttribute("class", childItem.class);
+  		    	// if (childItem.class === "unit") console.log("unit", )
+						childElement.innerText = childItem.value;
+						element.appendChild(childElement)
+					})
+		    } else {
+					element.innerText = item.value;
+				}
+				documentFragment.appendChild(element)
+			}
+		});
+
+		result_element.innerHTML = "";
+		result_element.appendChild(documentFragment)
+	}
+
+	function sync_scroll(element) {
+		/* Scroll result to scroll coords of event - sync with textarea */
+		let result_element = document.querySelector("#highlighting");
+		// Get and set x and y
+		result_element.scrollTop = element.scrollTop;
+		result_element.scrollLeft = element.scrollLeft;
 	}
 
   document.getElementById("bbInput").oninput=convert;

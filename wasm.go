@@ -5,7 +5,6 @@ package main
 import (
   "bb/parser"
   "fmt"
-  "encoding/json"
   "syscall/js"
 )
 
@@ -34,5 +33,5 @@ func WASMSyntax(this js.Value, p []js.Value) interface{} {
 
   data := parser.Syntax(p[0].String())
 
-  return js.ValueOf(data["items"].([]interface{})[0])
+  return js.ValueOf(data)
 }
