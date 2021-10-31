@@ -19,6 +19,21 @@ func Preview(input string) {
   parser.Preview(input)
 }
 
+// return bb input with each item classified
+func Syntax(input string) {
+  input = strings.Replace(input, "\\n", "\n", -1)  // convert raw escaped chars to literals
+  input = strings.Replace(input, "\\t", "\t", -1)
+
+  data := parser.Syntax(input)
+
+  j, err := json.Marshal(data)
+  if err != nil {
+    panic(err)
+  }
+
+  fmt.Println(string(j))
+}
+
 func Debug(input string) {
   input = strings.Replace(input, "\\n", "\n", -1)  // convert raw escaped chars to literals
   input = strings.Replace(input, "\\t", "\t", -1)
@@ -56,11 +71,11 @@ if err := func() (rootCmd *cobra.Command) {
 
   rootCmd = &cobra.Command{
     Use: "bb",
-    Short: "bb - pictographic programming language\nhttps://mattsimmons1.github.io/bb/",
+    Short: "\033[95m\033[1mbb\033[0m · pictographic programming language\nhomepage: https://mattsimmons1.github.io/bb/",
     Args: cobra.ArbitraryArgs,
     Run: func(c *cobra.Command, args []string){
       if len(args) < 1 {
-        fmt.Println("bb - pictographic programming language\nUsage:\n  bb [file path or string] [flags]\nUse \"bb help\" for more information.")
+        fmt.Println("\033[95m\033[1mbb\033[0m · pictographic programming language\nUsage:\n  bb [file path or string] [flags]\nUse \"bb help\" for more information.")
         return
       }
 
@@ -81,7 +96,6 @@ if err := func() (rootCmd *cobra.Command) {
       } else {
         input = definitionsFile + "\n" + input
       }
-
 
       if IsVerbose {
         parser.SetVerbose()
@@ -104,9 +118,50 @@ if err := func() (rootCmd *cobra.Command) {
   rootCmd.AddCommand(func() (createCmd *cobra.Command) {
     createCmd = &cobra.Command{
       Use:   "version",
-      Short: "print the version number",
+      Short: "Print the version number",
       Run: func(c *cobra.Command, args []string){
-        fmt.Println("v0.2.1")
+        fmt.Println("v0.2.2")
+      },
+    }
+    return
+  }())
+
+  rootCmd.AddCommand(func() (createCmd *cobra.Command) {
+    createCmd = &cobra.Command{
+      Use:   "syntax",
+      Short: "Classify each item in the input according to bb syntax and print as JSON",
+      Run: func(c *cobra.Command, args []string){
+        if len(args) < 1 {
+          err := c.Help()
+          if err != nil {
+            panic(err)
+          }
+          return
+        }
+
+        input := ""
+
+        // try to open argument as a file
+        data, err := ioutil.ReadFile(args[0])  // TODO: refactor
+        if err == nil {
+          input = string(data)
+        } else {
+          input = args[0]
+        }
+
+        // try to open definitions as a file - prepend to the input
+        definitionsData, err := ioutil.ReadFile(definitionsFile)
+        if err == nil {
+          input = string(definitionsData) + "\n" + input
+        } else {
+          input = definitionsFile + "\n" + input
+        }
+
+        if IsVerbose {
+          parser.SetVerbose()
+        }
+
+        Syntax(input)
       },
     }
     return
