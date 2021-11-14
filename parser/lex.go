@@ -360,7 +360,7 @@ func lexDefinition(l *lexer) stateFn {
 	l.acceptRun(" ")
 
 	if !l.accept("{") {
-		l.errorf("Invalid assignment, expected '{")
+		return l.errorf("Invalid assignment, expected '{")
 	}
 
 	l.emit(itemAssignment)  // ignored by the parser, for syntax highlighting only
