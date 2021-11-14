@@ -111,6 +111,12 @@
 	.bb .null {
 		color: #6482ff;
 	}
+	.bb .error {
+		color: lightgrey;
+		text-decoration-line: underline;
+		text-decoration-style: wavy;
+		text-decoration-color: darkred;
+	}
 
 </style>
 <h1><a href="../">bb</a> playground</h1>
@@ -212,11 +218,14 @@ b = { type: banana, *: isGreen, !: isEaten }
 
 		const syntax = wasm.bbSyntax(input);
 
-		console.log("syntax", syntax)
+		console.log("syntax", syntax);
 
+		let syntaxLength = 0;  // track how many characters we have in the syntax
+		let errorCount = 0;
 
 		syntax["items"].forEach(item => {
   		if (typeof(item) === "string") {
+  			syntaxLength += item.length;
 				documentFragment.appendChild(document.createTextNode(item))
 
 			} else if (typeof item === "object") {
@@ -231,6 +240,13 @@ b = { type: banana, *: isGreen, !: isEaten }
 						}
 					});
 				} else {
+					if (item.class === "error") {  // stop parsing after the first error -- TODO: why is there more than 1 error?
+						if (errorCount > 0) {
+							return
+						} else {
+							errorCount += 1
+						}
+					}
 					element = document.createElement("span");
 					element.setAttribute("class", item.class);
 				}
@@ -240,17 +256,24 @@ b = { type: banana, *: isGreen, !: isEaten }
   		    	childElement.setAttribute("class", childItem.class);
   		    	// if (childItem.class === "unit") console.log("unit", )
 						childElement.innerText = childItem.value;
+						syntaxLength += childItem.value.length;
 						element.appendChild(childElement)
 					})
 		    } else {
 					element.innerText = item.value;
+					syntaxLength += item.value.length;
 				}
 				documentFragment.appendChild(element)
 			}
 		});
 
 		result_element.innerHTML = "";
-		result_element.appendChild(documentFragment)
+
+		const remainingInput = document.createElement("span");
+		remainingInput.innerText = input.substr(syntaxLength);
+		documentFragment.appendChild(remainingInput);
+
+		result_element.appendChild(documentFragment);
 	}
 
 	function sync_scroll(element) {
