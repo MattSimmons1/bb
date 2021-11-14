@@ -21,6 +21,7 @@ type item struct {
 	pos  Pos      // The starting position, in bytes, of this item in the input string.
 	val  string   // The value of this item.
 	line int      // The line number at the start of this item.
+	message string  // additional info about the item, e.g. an error message
 }
 
 func (i item) String() string {
@@ -138,7 +139,7 @@ func (l *lexer) backup() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.start, l.input[l.start:l.pos], l.startLine}
+	l.items <- item{t, l.start, l.input[l.start:l.pos], l.startLine, ""}
 	l.start = l.pos
 	l.startLine = l.line
 }
@@ -169,7 +170,7 @@ func (l *lexer) acceptRun(valid string) {
 // errorf returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextItem.
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.items <- item{itemError, l.start, fmt.Sprintf(format, args...), l.startLine}
+	l.items <- item{itemError, l.start, l.input[l.start:l.pos], l.startLine, fmt.Sprintf(format, args...)}
 	return nil
 }
 
@@ -630,10 +631,12 @@ func (l *lexer) scanUnit() bool {
   word := ""
 
   // find the longest potential unit we can
+  // TODO: get the length of the longest unit (or PDT or key word) and only look up to this length to save time
 Loop:
 	for {
 		switch r := l.next(); {
-		case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		//case !(isSpace(r) || isNumeric(r) || isQuoteChar(r) || r == '='):  // if non unit character
+		case !isSpace(r):
 			log(string(r))
 			// absorb
 		default:
@@ -646,17 +649,23 @@ Loop:
 		}
 	}
 
+  wordEnd := l.pos
   // now we have the full word we need to make sure it's not a definition or key word
 	// look-ahead for assignment
 	l.acceptRun(" ")
 	if l.accept("=") {
-	  l.pos = start  // backtrack
-		return false
+		l.acceptRun(" ")
+		if l.accept("{") {
+	    l.pos = start  // backtrack
+		  return false  // must be a definition
+		}
 	}
   if word == "true" || word == "false" || word == "null" {
 		l.pos = start  // backtrack
 		return false  // it's a key word
 	}
+
+  l.pos = wordEnd  // backtrack in case we looked ahead too much
 
   // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
 	// e.g. UDTs are `W`. Input is `Wb`. Assumed to be [`W`, `b`].
@@ -757,7 +766,8 @@ func (l *lexer) scanModifier() bool {
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
 		// then scan value
-		if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+		//if isSpace(r) || isNumeric(r) || r == '"' || r == '`' || r == '.' || r == '-' {
+		if isSpace(r) {
 			// TODO: check for dot not followed by number or dash not followed by number or dot then number
 			// check it's a known modifier
 
@@ -810,6 +820,8 @@ func (l *lexer) scanModifier() bool {
 func (l *lexer) scanValue() bool {
 	log("scanValue")
 
+	start := l.pos
+
 	quoted := false
 	quoteChar := l.peek()
 	if quoteChar == '"' || quoteChar == '`' {
@@ -817,11 +829,11 @@ func (l *lexer) scanValue() bool {
 		l.next()
 	}
 
+	isDecimal := false
+
 Loop:
 	for {
 		switch r := l.next(); {
-		case isNumeric(r):
-			// absorb
 		case quoted && r == '\\':
 			if l.next() == quoteChar {
 				// absorb escaped quote
@@ -831,6 +843,19 @@ Loop:
 				l.backup()  // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != eof:
+			// absorb
+		case r == '-':
+			if l.pos != start + 1 {  // absorb but only at the start
+			  l.backup()
+				break Loop  // not a valid number but could be a modifier
+			}
+		case r == '.':
+			if isDecimal {
+        l.backup()
+        break Loop  // not a valid number but could be a modifier
+			}
+			isDecimal = true  // absorb but only once
+		case unicode.IsNumber(r):
 			// absorb
 		default:
 			if quoted {
@@ -843,6 +868,14 @@ Loop:
 			l.backup()
 			break Loop
 		}
+	}
+
+	if l.input[start:l.pos] == "-" || l.input[start:l.pos] == "." {
+		l.backup()  // check value is not invalid number - if so, remove it
+	}
+
+	if l.pos > start && l.input[l.pos-1:l.pos] == "." {  // don't allow numbers like '2.' as these could break modifiers starting with '.'
+		l.backup()  // remove decimal point
 	}
 
 	return true
@@ -1008,7 +1041,7 @@ func Syntax(input string) map[string]interface{} {
 		  case itemNull:
 			  output = append(output, map[string]interface{}{ "class": "null", "value": item.val })
 		  case itemError:
-			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val, "error": item.message })
 		  case itemComment:
 			  output = append(output, map[string]interface{}{ "class": "comment", "value": item.val })
 		  case itemEOF:

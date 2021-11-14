@@ -30,9 +30,10 @@ func Parse(input string) []interface{} {
 		if item.typ == itemNumber {
 			number, err := strconv.ParseFloat(item.val, 64)
 			if err != nil {
-				panic(err)
+				row = append(row, item.val)  // if number doesn't parse keep as string
+			} else {
+			  row = append(row, number)
 			}
-			row = append(row, number)
 		} else if item.typ == itemTab {
 			// todo
 		} else if item.typ == itemNewline {
@@ -119,9 +120,9 @@ func Debug(input string) {
 		}
 
 		if value != "" {
-		  fmt.Print(typeName, " \033[92m", value, "\033[0m")
+			fmt.Print(typeName, " \033[92m", value, "\033[0m")
 		} else {
-		  fmt.Print("\033[90m" + typeName, "\033[0m")
+			fmt.Print("\033[90m"+typeName, "\033[0m")
 		}
 		if jsonString != "" {
 			fmt.Print(" \033[91m", jsonString, "\033[0m")

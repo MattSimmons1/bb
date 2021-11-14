@@ -9,6 +9,7 @@ import (
   "github.com/spf13/cobra"
   "io/ioutil"
   "log"
+  "strconv"
   "strings"
 )
 
@@ -56,7 +57,13 @@ func Convert(input string, injectionMode bool) {
     panic(err)
   }
 
-  fmt.Println(string(j))
+  // convert escaped runes like '>' and '&' back
+  result, err := strconv.Unquote(strings.Replace(strconv.Quote(string(j)), `\\u`, `\u`, -1))
+  if err != nil {
+    panic(err)
+  }
+
+  fmt.Println(result)
 }
 
 func main() {
@@ -119,7 +126,7 @@ if err := func() (rootCmd *cobra.Command) {
       Use:   "version",
       Short: "Print the version number",
       Run: func(c *cobra.Command, args []string){
-        fmt.Println("v0.2.2")
+        fmt.Println("v0.2.3")
       },
     }
     return

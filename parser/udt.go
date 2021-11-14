@@ -33,7 +33,6 @@ func NewUDTFromDefinition(unit string, props map[string]string) {
   scriptProps := map[string]string{}
 
   for propName, propValue := range props {
-
     propName = removeQuotes(strings.TrimSpace(propName))
     propName = strings.ReplaceAll(propName, "\\:", ":")  // unescape :
     propName = strings.ReplaceAll(propName, "\\}", "}")  // unescape }
@@ -120,19 +119,38 @@ func (t *udt) Parse(s string) map[string]interface{} {
 
     } else if isNumeric(r) {
       valueIdx := pos
-      pos = valueIdx
+      isDecimal := false
+      //pos = valueIdx
       for {
         if pos == length || !isNumeric(rune(s[pos])) {
           break
+        } else if rune(s[pos]) == '-' {
+          if pos != valueIdx {
+            break  // negative sign can only appear at the start
+          }
+          pos++
+        } else if rune(s[pos]) == '.' {
+          if isDecimal {
+            break  // decimal point can only appear once
+          }
+          isDecimal = true
+          pos++
         } else {
           pos++
         }
       }
-      number, err := strconv.ParseFloat(s[valueIdx:pos], 64)
-      if err != nil {
-        data["value"] = s[valueIdx:pos]  // invalid values are kept as string, e.g. 1.0.0
+
+      value := s[valueIdx:pos]
+
+      if value == "-" || value == "." {
+        pos--  // invalid numerical value - not a value but a modifier instead
       } else {
-        data["value"] = number
+        number, err := strconv.ParseFloat(value, 64)
+        if err != nil {
+          data["value"] = s[valueIdx:pos]  // invalid values are kept as string, e.g. 1.0.0
+        } else {
+          data["value"] = number
+        }
       }
     }
   }
