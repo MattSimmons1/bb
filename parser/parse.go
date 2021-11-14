@@ -119,9 +119,9 @@ func Debug(input string) {
 		}
 
 		if value != "" {
-		  fmt.Print(typeName, " \033[92m", value, "\033[0m")
+			fmt.Print(typeName, " \033[92m", value, "\033[0m")
 		} else {
-		  fmt.Print("\033[90m" + typeName, "\033[0m")
+			fmt.Print("\033[90m"+typeName, "\033[0m")
 		}
 		if jsonString != "" {
 			fmt.Print(" \033[91m", jsonString, "\033[0m")

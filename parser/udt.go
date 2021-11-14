@@ -33,7 +33,6 @@ func NewUDTFromDefinition(unit string, props map[string]string) {
   scriptProps := map[string]string{}
 
   for propName, propValue := range props {
-
     propName = removeQuotes(strings.TrimSpace(propName))
     propName = strings.ReplaceAll(propName, "\\:", ":")  // unescape :
     propName = strings.ReplaceAll(propName, "\\}", "}")  // unescape }

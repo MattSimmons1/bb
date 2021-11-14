@@ -646,17 +646,23 @@ Loop:
 		}
 	}
 
+  wordEnd := l.pos
   // now we have the full word we need to make sure it's not a definition or key word
 	// look-ahead for assignment
 	l.acceptRun(" ")
 	if l.accept("=") {
-	  l.pos = start  // backtrack
-		return false
+		l.acceptRun(" ")
+		if l.accept("{") {
+	    l.pos = start  // backtrack
+		  return false  // must be a definition
+		}
 	}
   if word == "true" || word == "false" || word == "null" {
 		l.pos = start  // backtrack
 		return false  // it's a key word
 	}
+
+  l.pos = wordEnd  // backtrack in case we looked ahead too much
 
   // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
 	// e.g. UDTs are `W`. Input is `Wb`. Assumed to be [`W`, `b`].
