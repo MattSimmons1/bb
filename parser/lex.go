@@ -21,6 +21,7 @@ type item struct {
 	pos  Pos      // The starting position, in bytes, of this item in the input string.
 	val  string   // The value of this item.
 	line int      // The line number at the start of this item.
+	message string  // additional info about the item, e.g. an error message
 }
 
 func (i item) String() string {
@@ -138,7 +139,7 @@ func (l *lexer) backup() {
 
 // emit passes an item back to the client.
 func (l *lexer) emit(t itemType) {
-	l.items <- item{t, l.start, l.input[l.start:l.pos], l.startLine}
+	l.items <- item{t, l.start, l.input[l.start:l.pos], l.startLine, ""}
 	l.start = l.pos
 	l.startLine = l.line
 }
@@ -169,7 +170,7 @@ func (l *lexer) acceptRun(valid string) {
 // errorf returns an error token and terminates the scan by passing
 // back a nil pointer that will be the next state, terminating l.nextItem.
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.items <- item{itemError, l.start, fmt.Sprintf(format, args...), l.startLine}
+	l.items <- item{itemError, l.start, l.input[l.start:l.pos], l.startLine, fmt.Sprintf(format, args...)}
 	return nil
 }
 
@@ -1040,7 +1041,7 @@ func Syntax(input string) map[string]interface{} {
 		  case itemNull:
 			  output = append(output, map[string]interface{}{ "class": "null", "value": item.val })
 		  case itemError:
-			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val })
+			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val, "error": item.message })
 		  case itemComment:
 			  output = append(output, map[string]interface{}{ "class": "comment", "value": item.val })
 		  case itemEOF:
