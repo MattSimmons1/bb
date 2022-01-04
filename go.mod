@@ -1,4 +1,4 @@
-module bb
+module github.com/MattSimmons1/bb
 
 go 1.16
 
