@@ -294,7 +294,7 @@ func ParseUDT(input string) interface{} {
   }
 }
 
-func DefineBuiltInTypes() {  // these are handled differently
+func defineBuiltInTypes() {  // these are handled differently
   PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{})
   PDTs["json"].isSpecial = true
   PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{})

@@ -67,7 +67,6 @@ func Convert(input string, injectionMode bool) {
 }
 
 func main() {
-  parser.DefineBuiltInTypes()
 
 if err := func() (rootCmd *cobra.Command) {
   var IsPreview bool

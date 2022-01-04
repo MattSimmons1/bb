@@ -327,9 +327,7 @@ Loop:
 		default:
 			l.backup()
 			word := l.input[l.start:l.pos]
-			if !l.atTerminator() && r != '=' {
-				return l.errorf("bad character %#U", r)  // TODO: is there such a thing?
-			}
+
 			switch {
 			case word == "true", word == "false":
 				l.emit(itemBool)
@@ -542,22 +540,6 @@ Loop:
 
 	}
   return nil
-}
-
-// atTerminator reports whether the input is at valid termination character to
-// appear after an identifier. Breaks .X.Y into two pieces. Also catches cases
-// like "$x+2" not being acceptable without a space, in case we decide one
-// day to implement arithmetic.
-func (l *lexer) atTerminator() bool {
-	r := l.peek()
-	if isSpace(r) {
-		return true
-	}
-	switch r {
-	case eof, '.', ',', '|', ':', ')', '(':
-		return true
-	}
-	return false
 }
 
 
