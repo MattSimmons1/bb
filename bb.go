@@ -3,7 +3,7 @@
 package main
 
 import (
-  "bb/parser"
+  "github.com/MattSimmons1/bb/parser"
   "encoding/json"
   "fmt"
   "github.com/spf13/cobra"
