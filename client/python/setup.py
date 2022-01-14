@@ -1,17 +1,18 @@
 
 from setuptools import setup
-import pathlib
+import os
 
-here = pathlib.Path(__file__).parent
+here = os.path.abspath(os.path.dirname(__file__))
 
 # The text of the README file
-README = (here / "README.md").read_text()
+README = open(here + "/README.md").read()
 
 setup(
-    name="bb",
+    name="bb-python",
     version="0.1.0",
     description="bb Python Client",
     long_description=README,
+    long_description_content_type="text/markdown",
     packages=["bb"],
     author='Matt Simmons',
     author_email='',

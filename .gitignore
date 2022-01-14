@@ -3,5 +3,6 @@
 
 venv
 __pycache__
+client/python/dist
 client/python/build
 *.egg-info
