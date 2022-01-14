@@ -3,9 +3,9 @@
 package main
 
 import (
-  "github.com/MattSimmons1/bb/parser"
   "encoding/json"
   "fmt"
+  "github.com/MattSimmons1/bb/parser"
   "github.com/spf13/cobra"
   "io/ioutil"
   "log"
@@ -126,7 +126,7 @@ if err := func() (rootCmd *cobra.Command) {
       Use:   "version",
       Short: "Print the version number",
       Run: func(c *cobra.Command, args []string){
-        fmt.Println("v0.2.3")
+        fmt.Println("v0.2.4")
       },
     }
     return
