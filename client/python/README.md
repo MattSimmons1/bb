@@ -5,14 +5,8 @@
 
 First install the bb binary, then pip install:
 
-    go get github.com/MattSimmons1/bb
-    pip install ./client/python
-    
-or
-
-    go get github.com/MattSimmons1/bb
-    pip install "git+ssh://git@github.com/MattSimmons1/bb.git#subdirectory=client/python"
-    
+    go install github.com/MattSimmons1/bb@latest
+    pip install bb-python
 
 If you don't have go installed, download the bb binary from the [releases page](https://github.com/MattSimmons1/bb/releases) 
 and save to a location on your PATH or your working directory.

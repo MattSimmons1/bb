@@ -131,3 +131,7 @@ func Debug(input string) {
 
 	fmt.Print("\n\n")
 }
+
+func init()  {
+	defineBuiltInTypes()
+}

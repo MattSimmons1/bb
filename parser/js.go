@@ -10,7 +10,7 @@ func RunScript(script string, datum interface{}) interface{} {
   vm := otto.New()
   _, err := vm.Run(script)  // define function
   if err != nil {
-    panic("Got an error defining function '" + script + "'")
+    log("Got an error defining function '" + script + "'")
     panic(err)
   }
 
