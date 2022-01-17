@@ -32,14 +32,24 @@ go get github.com/MattSimmons1/bb
 
 Alternatively, download the binary from the [releases page](https://github.com/MattSimmons1/bb/releases) and save to a location on your PATH.
 
-### Usage
+There is also a [Python library](https://pypi.org/project/bb-python/) for using bb within scripts.
 
-```shell-session
-$ bb "hello world"  
-["hello", "world"]
+```bash
+pip install bb-python
 ```
 
-or read from a file:
+See the [Python client docs](./client/python) for code examples.
+
+### Usage
+
+bb can be used from the command line. It takes a string from bb syntax and outputs JSON:
+
+```shell-session
+$ bb "hello world 123"  
+["hello", "world", 123]
+```
+
+To read from a file:
 
 ```shell-session
 $ cat my_data.bb.txt

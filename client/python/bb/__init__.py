@@ -22,7 +22,7 @@ if BB_PATH is None:
     if os.path.isfile(f"{here}/bb"):  # look for bb in the bb Python package directory
         BB_PATH = f"{here}/bb"
     elif os.path.isfile("./bb"):  # look for bb in the working directory
-        copyfile("./bb", f"{here}/")
+        copyfile("./bb", f"{here}/bb")
         BB_PATH = f"{here}/bb"
     else:
         raise EnvironmentError("bb binary was not found! Install bb with: go get github.com/MattSimmons1/bb, "
