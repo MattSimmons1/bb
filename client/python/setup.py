@@ -9,7 +9,7 @@ README = open(here + "/README.md").read()
 
 setup(
     name="bb-python",
-    version="0.1.1",
+    version="0.1.2",
     description="bb Python Client",
     long_description=README,
     long_description_content_type="text/markdown",
@@ -25,6 +25,6 @@ setup(
     ],
     url="https://mattsimmons1.github.io/bb",
     install_requires=[],
-    package_data={"bb": ["bb"]},
+    package_data={"bb": ["./bb/lib/**/*"]},
     include_package_data=True,
 )

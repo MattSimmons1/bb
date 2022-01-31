@@ -5,4 +5,6 @@ venv
 __pycache__
 client/python/dist
 client/python/build
+client/python/bb/bb
+client/python/bb/lib
 *.egg-info

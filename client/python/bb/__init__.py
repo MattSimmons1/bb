@@ -4,13 +4,12 @@ import json
 import os
 import logging
 from typing import Any
-from shutil import copyfile
 
 from .util import which
 
 log = logging.getLogger("bb")
 here = os.path.abspath(os.path.dirname(__file__))  # something like site-packages/bb
-
+workdir = os.path.abspath("")
 
 #
 # setup
@@ -19,20 +18,36 @@ here = os.path.abspath(os.path.dirname(__file__))  # something like site-package
 BB_PATH = which()  # look for existing bb installation
 
 if BB_PATH is None:
-    if os.path.isfile(f"{here}/bb"):  # look for bb in the bb Python package directory
-        BB_PATH = f"{here}/bb"
-    elif os.path.isfile("./bb"):  # look for bb in the working directory
-        copyfile("./bb", f"{here}/bb")
-        BB_PATH = f"{here}/bb"
+    if os.path.isfile(f"{workdir}/bb"):  # look for bb in the working directory
+        BB_PATH = f"{workdir}/bb"
     else:
-        raise EnvironmentError("bb binary was not found! Install bb with: go get github.com/MattSimmons1/bb, "
-                               "or download the binary and put it in your current working directory.")
+        import platform
+        # Determine the correct platform
+        system = platform.system()
+        arch, _ = platform.architecture()
+        print(system, arch)
+        if system == 'Linux':
+            # if arch == '32bit':
+            BB_PATH = f"{here}/lib/linux_386/bb"
+        if system == "Darwin":
+            if arch == "64bit":
+                BB_PATH = f"{here}/lib/darwin_amd64/bb"
+        else:
+            BB_PATH = f"{here}/lib/darwin_amd64/bb"
 
+    if BB_PATH is None:
+        raise EnvironmentError(f"bb binary was not found for {system} {arch}! "
+                               f"Install bb with: go get github.com/MattSimmons1/bb, "
+                               "or download the binary and put it in your current working directory.")
 
 if not os.access(BB_PATH, os.X_OK):
     os.chmod(BB_PATH, 0o777)
-    assert os.access(BB_PATH, os.X_OK), "Cannot get permission to execute bb binary file"
+    assert os.access(BB_PATH, os.X_OK), "Cannot get permission to execute bb binary"
 
+try:
+    p = subprocess.Popen([BB_PATH], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+except OSError:
+    raise EnvironmentError("The bb binary could not be executed. This could be due to the platform ")
 
 #
 #
