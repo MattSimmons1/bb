@@ -9,7 +9,7 @@ README = open(here + "/README.md").read()
 
 setup(
     name="bb-python",
-    version="0.1.2",
+    version="0.1.3",
     description="bb Python Client",
     long_description=README,
     long_description_content_type="text/markdown",

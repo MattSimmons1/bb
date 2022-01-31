@@ -27,18 +27,18 @@ if BB_PATH is None:
         arch, _ = platform.architecture()
         print(system, arch)
         if system == 'Linux':
-            # if arch == '32bit':
-            BB_PATH = f"{here}/lib/linux_386/bb"
-        if system == "Darwin":
+            if arch == '64bit':
+                BB_PATH = f"{here}/lib/linux_386/bb"
+        elif system == "Darwin":
             if arch == "64bit":
                 BB_PATH = f"{here}/lib/darwin_amd64/bb"
         else:
             BB_PATH = f"{here}/lib/darwin_amd64/bb"
 
-    if BB_PATH is None:
-        raise EnvironmentError(f"bb binary was not found for {system} {arch}! "
-                               f"Install bb with: go get github.com/MattSimmons1/bb, "
-                               "or download the binary and put it in your current working directory.")
+        if BB_PATH is None:
+            raise EnvironmentError(f"bb binary was not found for {system} {arch}! "
+                                   f"Install bb with: go get github.com/MattSimmons1/bb, "
+                                   "or download the binary and put it in your current working directory.")
 
 if not os.access(BB_PATH, os.X_OK):
     os.chmod(BB_PATH, 0o777)
