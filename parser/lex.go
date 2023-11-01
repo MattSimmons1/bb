@@ -201,6 +201,7 @@ func lex(input string) *lexer {
 		line:          1,
 		startLine:     1,
 		instanceIndex: 0,
+		UDTs:          map[string]*udt{},
 		PDTs:          map[string]*udt{},
 	}
 
@@ -982,6 +983,21 @@ func Preview(input string) {
 	}
 }
 
+func (l *lexer) ParseUDT(input string) interface{} {
+	unit := l.udtInstances[l.instanceIndex]
+
+	f := func() {
+		l.instanceIndex++
+	}
+	defer f()
+
+	t := l.UDTs[unit]
+	if t == nil {
+		t = l.PDTs[unit]
+	}
+	return ParseUDT(input, t, *l.modifierInstances[l.instanceIndex])
+}
+
 // return all items from the input and what colour they should be as a JSON object
 func Syntax(input string) map[string]interface{} {
 	l := lex(input)
@@ -995,8 +1011,8 @@ func Syntax(input string) map[string]interface{} {
 		case itemUDT:
 
 			unit := l.udtInstances[l.instanceIndex]
-			//udt := UDTs[unit]
 			data := l.ParseUDT(item.val)
+
 			udt := make([]interface{}, 0)
 			log(item.val)
 

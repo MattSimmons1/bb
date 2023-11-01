@@ -24,7 +24,7 @@ func NewUDT(unit string, numericalProps map[string]float64, stringProps map[stri
 		isSpecial: false}
 }
 
-// create UDT and add to global map
+// NewUDTFromDefinition creates new UDT instances
 func NewUDTFromDefinition(unit string, props map[string]string) *udt {
 	log("Define new UDT with unit " + unit)
 
@@ -68,7 +68,7 @@ func NewUDTFromDefinition(unit string, props map[string]string) *udt {
 }
 
 // parse a UDT string - we already know it's valid
-func (t *udt) Parse(s string, l *lexer) map[string]interface{} {
+func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{} {
 	log("parse " + s + " with unit " + t.Unit)
 
 	pos := strings.Index(s, t.Unit)
@@ -153,7 +153,7 @@ func (t *udt) Parse(s string, l *lexer) map[string]interface{} {
 		}
 	}
 
-	for modifier, rawValue := range *l.modifierInstances[l.instanceIndex] {
+	for modifier, rawValue := range modifiers {
 		t.addModifierToData(data, modifier, rawValue)
 	}
 
@@ -225,22 +225,14 @@ func (t *udt) addModifierToData(data map[string]interface{}, modifier string, va
 	}
 }
 
-// ParseUDT converts a string UDT to JSON. This has to be a method of the lexer
-func (l *lexer) ParseUDT(input string) interface{} {
-	unit := l.udtInstances[l.instanceIndex]
+// ParseUDT converts a string to a given UDT and then converts to JSON
+func ParseUDT(input string, t *udt, modifiers map[string]string) interface{} {
 
-	f := func() {
-		l.instanceIndex++
-	}
-	defer f()
+	unit := t.Unit
 
-	t := l.UDTs[unit]
-	if t == nil {
-		t = l.PDTs[unit]
-	}
 	if t.isSpecial { // special type - convert to pure json
 		if unit == "json" {
-			data := t.Parse(input, l)
+			data := t.Parse(input, modifiers)
 			if data["value"] != nil {
 				var valueData interface{}
 				if _, ok := data["value"].(string); !ok {
@@ -260,7 +252,7 @@ func (l *lexer) ParseUDT(input string) interface{} {
 		} else {
 			//} else if unit == "yaml" {
 
-			data := t.Parse(input, l)
+			data := t.Parse(input, modifiers)
 			if data["value"] != nil {
 
 				if _, ok := data["value"].(string); !ok {
@@ -281,7 +273,7 @@ func (l *lexer) ParseUDT(input string) interface{} {
 		}
 
 	} else {
-		return t.Parse(input, l)
+		return t.Parse(input, modifiers)
 	}
 }
 
