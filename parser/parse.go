@@ -1,4 +1,3 @@
-
 package parser
 
 import (
@@ -14,7 +13,7 @@ func removeQuotes(s string) string {
 	}
 	if quoteChar := s[:1]; quoteChar == `"` || quoteChar == "`" {
 		if s[len(s)-1:] == quoteChar {
-			return s[1:len(s)-1]
+			return s[1 : len(s)-1]
 		}
 	}
 	return s
@@ -25,14 +24,14 @@ func Parse(input string) []interface{} {
 	l := lex(input)
 
 	//data := make([]interface{}, 0)
-	row := make([]interface{}, 0)  // TODO row logic
+	row := make([]interface{}, 0) // TODO row logic
 	for item := range l.items {
 		if item.typ == itemNumber {
 			number, err := strconv.ParseFloat(item.val, 64)
 			if err != nil {
-				row = append(row, item.val)  // if number doesn't parse keep as string
+				row = append(row, item.val) // if number doesn't parse keep as string
 			} else {
-			  row = append(row, number)
+				row = append(row, number)
 			}
 		} else if item.typ == itemTab {
 			// todo
@@ -42,23 +41,23 @@ func Parse(input string) []interface{} {
 			row = append(row, strings.TrimSpace(removeQuotes(item.val)))
 		} else if item.typ == itemBool {
 			if item.val == "true" {
-			  row = append(row, true)
+				row = append(row, true)
 			} else {
-			  row = append(row, false)
+				row = append(row, false)
 			}
 		} else if item.typ == itemNull {
 			row = append(row, nil)
 		} else if item.typ == itemUDT {
-			row = append(row, ParseUDT(item.val))
+			row = append(row, l.ParseUDT(item.val))
 		} else {
 			// definitions, comments, and spaces are ignored
 		}
 	}
 
-  return row
+	return row
 }
 
-func ParseInjectionMode(input string) []interface{}  {
+func ParseInjectionMode(input string) []interface{} {
 	injectedInput := lexInjectionMode(input)
 
 	return Parse(injectedInput)
@@ -84,7 +83,7 @@ func Debug(input string) {
 		case itemUDT:
 			typeName = "\nUDT"
 			value = item.val
-			data := ParseUDT(item.val)
+			data := l.ParseUDT(item.val)
 			j, err := json.Marshal(data)
 			if err != nil {
 				panic(err)
@@ -130,8 +129,4 @@ func Debug(input string) {
 	}
 
 	fmt.Print("\n\n")
-}
-
-func init()  {
-	defineBuiltInTypes()
 }
