@@ -98,11 +98,16 @@ func SetVerbose() {
 
 func log(message string) {
 	if verbose {
-		if message == "lexBb" {
-			fmt.Print("\n", "\033[92m", message, "\033[0m")
+		if len(message) == 1 {
+			if message == "\n" {
+				message = "\\n"
+			}
+			fmt.Print("/\033[94m", message, "\033[0m")
+		} else if message == "lexBb" {
+			fmt.Print("\n\033[92m", message, "\033[0m")
 		} else {
 			if strings.HasPrefix(message, "lex") {
-				fmt.Print("/", "\033[92m", message, "\033[0m")
+				fmt.Print("/\033[92m", message, "\033[0m")
 			} else {
 				fmt.Print("/", message)
 			}
@@ -122,6 +127,7 @@ func (l *lexer) next() rune {
 	if r == '\n' {
 		l.line++
 	}
+	log(string(r))
 	return r
 }
 
@@ -226,34 +232,6 @@ const (
 	rightComment = "*/"
 )
 
-// lexComment scans a comment. The left comment marker is known to be present.
-func lexComment(l *lexer) stateFn {
-	log("lexComment")
-	l.pos += Pos(len(leftComment))
-	i := strings.Index(l.input[l.pos:], rightComment)
-	if i < 0 {
-		return l.errorf("unclosed comment")
-	}
-	l.pos += Pos(i + len(rightComment))
-	l.emit(itemComment)
-	return lexBb
-}
-
-func lexInlineComment(l *lexer) stateFn {
-	log("lexInlineComment")
-	i := strings.Index(l.input[l.pos:], "\n") // there will always be one because we add one
-
-	log("comment is: " + l.input[l.pos:l.pos+Pos(i)])
-	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
-	splitComment := strings.SplitN(cleanedComment, " ", 2)
-	if splitComment[0] == "import" && len(splitComment) > 1 {
-		l.defineImportedTypes(strings.ToLower(splitComment[1]))
-	}
-	l.pos += Pos(i)
-	l.emit(itemComment)
-	return lexBb
-}
-
 // lexBb scans bb
 func lexBb(l *lexer) stateFn {
 	log("lexBb")
@@ -291,6 +269,34 @@ func lexBb(l *lexer) stateFn {
 	default:
 		return lexIdentifier // all unicode is allowed, so assume everything else is the start of a definition
 	}
+	return lexBb
+}
+
+// lexComment scans a comment. The left comment marker is known to be present.
+func lexComment(l *lexer) stateFn {
+	log("lexComment")
+	l.pos += Pos(len(leftComment))
+	i := strings.Index(l.input[l.pos:], rightComment)
+	if i < 0 {
+		return l.errorf("unclosed comment")
+	}
+	l.pos += Pos(i + len(rightComment))
+	l.emit(itemComment)
+	return lexBb
+}
+
+func lexInlineComment(l *lexer) stateFn {
+	log("lexInlineComment")
+	i := strings.Index(l.input[l.pos:], "\n") // there will always be one because we add one
+
+	log("comment is: " + l.input[l.pos:l.pos+Pos(i)])
+	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
+	splitComment := strings.SplitN(cleanedComment, " ", 2)
+	if splitComment[0] == "import" && len(splitComment) > 1 {
+		l.defineImportedTypes(strings.ToLower(splitComment[1]))
+	}
+	l.pos += Pos(i)
+	l.emit(itemComment)
 	return lexBb
 }
 
@@ -354,6 +360,35 @@ Loop:
 				l.emit(itemString)
 			}
 			break Loop
+		}
+	}
+
+	return lexBb
+}
+
+// scans an alphanumeric that isn't a udt or a number or a definition
+func lexString(l *lexer) stateFn {
+	log("lexString")
+Loop:
+	for {
+		switch l.next() {
+
+		case ' ', '\n':
+			l.backup()
+			word := l.input[l.start:l.pos]
+
+			switch word {
+			case "true", "false":
+				l.emit(itemBool)
+			case "null":
+				l.emit(itemNull)
+			default:
+				log("string is '" + word + "'")
+				l.emit(itemString)
+			}
+			break Loop
+		default:
+			// absorb
 		}
 	}
 
@@ -557,15 +592,23 @@ Loop:
 // We have not consumed any characters
 func lexUDT(l *lexer) stateFn {
 	log("lexUDT")
-	start := l.pos
+	//start := l.pos
 
-	if isNumeric(l.peek()) { // if starts with quantity - scan the number then the unit
+	if isNumeric(l.peek()) { // if starts with quantity - scan the number then the unit (it could also be a string that starts with a number)
 		if l.scanNumber(true) {
 			l.emit(itemUDT)
 			return lexBb
-		} else { // not a DT so must be a number - can't be anything else because it starts with a number
-			l.pos = start
-			return lexNumber
+		} else if l.scanNumber(false) { // not a DT so must be a number or a string
+			//l.pos = start
+			//return lexNumber
+			l.emit(itemNumber)
+			return lexBb
+		} else {
+			log("number is actually a string that starts with a number")
+			//l.pos = start
+			return lexString
+			//l.pos = start
+			//return lexIdentifier
 		}
 	} else if l.scanUnit() { // must start with a unit, or could be string or identifier
 
@@ -605,9 +648,13 @@ func lexUDT(l *lexer) stateFn {
 // and "089" - but when it's wrong the input is invalid and the parser (via
 // strconv) will notice.
 func lexNumber(l *lexer) stateFn {
+	//start := l.pos
 	log("lexNumber")
 	if !l.scanNumber(false) {
-		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
+		log("number is actually a string that starts with a number")
+		//l.pos = start
+		return lexString
+		//return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
 	}
 	l.emit(itemNumber)
 	return lexBb
@@ -692,7 +739,8 @@ Loop:
 	}
 }
 
-// determine if we have a valid number or udt
+// scanNumber determines if we have a valid number, or if `udt = true`, a udt that starts with a quantity.
+// Returns false and backtracks if it's not a number, which means it could be a string.
 func (l *lexer) scanNumber(udt bool) bool {
 	startPos := l.pos
 
@@ -912,6 +960,7 @@ Loop:
 }
 
 // only used for seeing if a prop should be included in the output - standard modifier chars are not
+// TODO: not working for '•'
 func isModifierChar(r rune) bool {
 	return strings.ContainsRune(modifiers, r)
 }
@@ -998,7 +1047,7 @@ func (l *lexer) ParseUDT(input string) interface{} {
 	return ParseUDT(input, t, *l.modifierInstances[l.instanceIndex])
 }
 
-// return all items from the input and what colour they should be as a JSON object
+// Syntax returns all items from the input and what colour they should be as a JSON object
 func Syntax(input string) map[string]interface{} {
 	l := lex(input)
 
