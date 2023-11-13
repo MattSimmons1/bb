@@ -10,38 +10,44 @@ import (
 )
 
 type udt struct {
+	isSpecial      bool // has special properties that affect parsing (for pre-defined types)
+	colonAllowed   bool // see lexer.colonAllowed
 	Unit           string
 	NumericalProps map[string]float64
 	StringProps    map[string]string
 	ScriptProps    map[string]string
 	HiddenProps    []string
-	isSpecial      bool // has special properties that affect parsing (for pre-defined types)
+	QuoteModifiers bool // if true, then this UDT is using " as a modifier, which affects parsing
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
-	scriptProps map[string]string) *udt {
+	scriptProps map[string]string, quoteModifiers bool) *udt {
 	return &udt{Unit: unit, NumericalProps: numericalProps, StringProps: stringProps, ScriptProps: scriptProps,
-		isSpecial: false}
+		isSpecial: false, QuoteModifiers: quoteModifiers}
 }
 
-// NewUDTFromDefinition creates new UDT instances
+// NewUDTFromDefinition creates new UDT instances.
 func NewUDTFromDefinition(unit string, props map[string]string) *udt {
 	log("Define new UDT with unit " + unit)
 
 	numericalProps := map[string]float64{}
 	stringProps := map[string]string{}
 	scriptProps := map[string]string{}
+	quoteModifiers := false
 
 	for propName, propValue := range props {
-		propName = removeQuotes(strings.TrimSpace(propName))
+		propName = strings.TrimSpace(propName)
 		propName = strings.ReplaceAll(propName, "\\:", ":") // unescape :
 		propName = strings.ReplaceAll(propName, "\\}", "}") // unescape }
 
-		propValue = removeQuotes(strings.TrimSpace(propValue))
+		propValue = strings.TrimSpace(propValue)
 		propValue = strings.ReplaceAll(propValue, "\\,", ",") // unescape ,
 		propValue = strings.ReplaceAll(propValue, "\\}", "}") // unescape }
 
 		log("found prop '" + propName + "' with value '" + propValue + "'")
+		if strings.Contains(propName, "\"") {
+			quoteModifiers = true
+		}
 
 		if number, err := strconv.ParseFloat(propValue, 64); err == nil { // if value is valid number
 			log("numerical prop: " + propName)
@@ -64,7 +70,7 @@ func NewUDTFromDefinition(unit string, props map[string]string) *udt {
 		}
 	}
 
-	return NewUDT(unit, numericalProps, stringProps, scriptProps)
+	return NewUDT(unit, numericalProps, stringProps, scriptProps, quoteModifiers)
 }
 
 // parse a UDT string - we already know it's valid
@@ -89,10 +95,13 @@ func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{
 
 	length := len(s)
 
+	// TODO (big refactor) Don't re-parse stuff - store all parsed values during lexing (in the UDT instance)
 	if pos != length { // if there is anything remaining
+		hasValue := false
 
-		if r := rune(s[pos]); isQuoteChar(r) {
+		if r := rune(s[pos]); isQuoteChar(r) || r == ':' {
 			log("UDT has value")
+			hasValue = true
 			// we already know that value is valid from lexing
 			if isQuoteChar(r) {
 				log("this is left: " + s[pos:])
@@ -100,7 +109,14 @@ func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{
 				valueIdx := pos + 1
 				pos = valueIdx
 				for {
-					if rune(s[pos]) == r {
+					if t.QuoteModifiers && len(s) == pos {
+						// if we get to the end it's because this is actually a quote modifier, which
+						// means there is no value for this udt
+						log("wait no, UDT has no value")
+						hasValue = false
+						break
+					} else if rune(s[pos]) == r {
+						// we found the end quote
 						break
 					} else if rune(s[pos]) == '\\' && rune(s[pos+1]) == r {
 						pos += 2 // escaped quotes
@@ -109,12 +125,31 @@ func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{
 						pos++
 					}
 				}
+				if hasValue {
+					data["value"] = s[valueIdx:pos]
+					pos++
+				}
+				// TODO: we still want to remove the backslashes from escaped quotes
+			} else if r == ':' {
+				log("it's an unquoted value - this is left: " + s[pos:])
+
+				valueIdx := pos + 1
+				pos = valueIdx
+
+				for {
+					if pos == length { //|| rune(s[pos]) == ' ' || rune(s[pos]) == '\n' {
+						break // we found the end - unquoted value can end on space or new line
+					} else if rune(s[pos]) == '\\' && rune(s[pos+1]) == ' ' {
+						pos += 2 // escaped space (technically we do allow these)
+					} else {
+						log("this is left: " + s[pos:])
+						pos++
+					}
+				}
+				// TODO: we still want to remove the backslashes from escaped spaces
 				data["value"] = s[valueIdx:pos]
 				pos++
 			}
-
-			log("value is " + data["value"].(string))
-
 		} else if isNumeric(r) {
 			valueIdx := pos
 			isDecimal := false
@@ -278,11 +313,11 @@ func ParseUDT(input string, t *udt, modifiers map[string]string) interface{} {
 }
 
 func (l *lexer) defineBuiltInTypes() { // these are handled differently
-	l.PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{})
+	l.PDTs["json"] = NewUDT("json", map[string]float64{}, map[string]string{}, map[string]string{}, false)
 	l.PDTs["json"].isSpecial = true
-	l.PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{})
+	l.PDTs["yaml"] = NewUDT("yaml", map[string]float64{}, map[string]string{}, map[string]string{}, false)
 	l.PDTs["yaml"].isSpecial = true
-	l.PDTs["md"] = NewUDT("md", map[string]float64{}, map[string]string{"type": "markdown"}, map[string]string{})
+	l.PDTs["md"] = NewUDT("md", map[string]float64{}, map[string]string{"type": "markdown"}, map[string]string{}, false)
 }
 
 func (l *lexer) defineImportedTypes(collectionName string) {
@@ -333,7 +368,7 @@ func (l *lexer) defineImportedTypes(collectionName string) {
 		for _, t := range SITypes {
 			def := strings.SplitN(t, ",", 3)
 			l.PDTs[def[0]] = NewUDT(def[0], map[string]float64{}, map[string]string{"unit": def[1], "type": def[2]},
-				map[string]string{})
+				map[string]string{}, false)
 		}
 	}
 
@@ -370,7 +405,7 @@ func (l *lexer) defineImportedTypes(collectionName string) {
 			def := strings.Split(t, ",")
 			for _, unit := range def[:len(def)-1] {
 				l.PDTs[unit] = NewUDT(unit, map[string]float64{}, map[string]string{"unit": def[len(def)-1], "type": "money"},
-					map[string]string{})
+					map[string]string{}, false)
 			}
 		}
 	}
@@ -391,7 +426,7 @@ func (l *lexer) couldBeUDT(r rune) bool {
 		}
 		i++
 	}
-	for k := range l.PDTs { // now check PDTs TODO: pre-make this array?
+	for k := range l.PDTs { // now check PDTs
 		log(string([]rune(k)[0]))
 		if r == []rune(k)[0] { // does the first rune in the UDT's unit match
 			log("could " + string(r) + " be a udt? actually it's a pdt!")

@@ -73,21 +73,33 @@ type stateFn func(*lexer) stateFn
 
 // lexer holds the state of the scanner.
 type lexer struct {
-	name              string               // the name of the input; used only for error reports
-	input             string               // the string being scanned
-	emitComment       bool                 // emit itemComment tokens.
-	pos               Pos                  // current position in the input
-	start             Pos                  // start position of this item
-	width             Pos                  // width of last rune read from input
-	items             chan item            // channel of scanned items
-	parenDepth        int                  // nesting depth of ( ) exprs
-	line              int                  // 1+number of newlines seen
-	startLine         int                  // start line of this item
+	name        string    // the name of the input; used only for error reports
+	input       string    // the string being scanned
+	emitComment bool      // emit itemComment tokens.
+	pos         Pos       // current position in the input
+	start       Pos       // start position of this item
+	width       Pos       // width of last rune read from input
+	items       chan item // channel of scanned items
+	parenDepth  int       // nesting depth of ( ) exprs
+	line        int       // 1+number of newlines seen
+	startLine   int       // start line of this item
+	// if dashAllowed is true, then '-' can be used to represent negative numbers in values and quantities (default behavior)
+	// if the user defines it as a type then dashAllowed will be set to false and '-' will only be treated as a udt.
+	// if '-' is used as a modifier at the same time as negative values, strange things will happen
+	dashAllowed bool
+	// if dotAllowed is true, then '.' can be used to represent decimal numbers (default behavior)
+	// if the user defines it as a type then dotAllowed will be set to false and '.' will only be treated as a udt.
+	// if '.' is used as a modifier, strange things will happen
+	dotAllowed bool
+	// if colonAllowed is true, then ':' can be used to start an unquoted value (default behavior)
+	// if the user defines it as a type or modifier then colonAllowed will be set to false and
+	// unquoted values will be disabled
+	colonAllowed      bool
 	UDTs              map[string]*udt      // stores user defined types
 	PDTs              map[string]*udt      // stores pre-defined types - these can change if user imports more types
 	udtInstances      []string             // stores the unit of every UDT we find
 	instanceIndex     int                  // only used for parsing - the current index of udtInstances we're parsing
-	modifierInstances []*map[string]string // stores every modifier and raw value we find
+	modifierInstances []*map[string]string // stores every modifier and raw value we find TODO: this can be moved to the UDTs
 }
 
 var verbose = false
@@ -207,6 +219,9 @@ func lex(input string) *lexer {
 		line:          1,
 		startLine:     1,
 		instanceIndex: 0,
+		dashAllowed:   true,
+		dotAllowed:    true,
+		colonAllowed:  true,
 		UDTs:          map[string]*udt{},
 		PDTs:          map[string]*udt{},
 	}
@@ -395,7 +410,7 @@ Loop:
 	return lexBb
 }
 
-// lex and parse at the same time - '∆ =' has already been consumed
+// lex and parse at the same time. The assignment (e.g. '∆ =') has already been consumed.
 func lexDefinition(l *lexer) stateFn {
 	log("lexDefinition")
 	unit := strings.TrimSpace(l.input[l.start : l.pos-1])
@@ -436,7 +451,6 @@ Loop:
 				return err
 			}
 			props[propName] = propValue
-
 		}
 	}
 
@@ -446,16 +460,26 @@ Loop:
 	//definitionValue := l.input[l.start:l.pos]
 	l.UDTs[unit] = NewUDTFromDefinition(unit, props)
 
+	// if the new unit is a special character then update the rules of the lexer
+	switch unit {
+	case "-":
+		l.dashAllowed = false
+	case ".":
+		l.dotAllowed = false
+	case ":":
+		l.colonAllowed = false
+	}
+
 	//l.emit(itemDefinition)
 
 	return lexBb
 }
 
-// Extract the prop name and value. Ignores quotes and spaces.
+// Extract the prop name and value. Double quotes and spaces are ignored.
 func (l *lexer) scanProp() (stateFn, string, string) {
 	log("scanProp")
 
-	start := l.pos - 1
+	start := l.pos
 	propName := ""
 	propValue := ""
 	// TODO: allow commas in quoted value
@@ -465,12 +489,12 @@ Loop:
 		switch r := l.next(); r {
 		case eof, '}':
 			return l.errorf("Expected ':' at the end of prop name"), "", ""
-		case '"', '`':
-			err := l.scanQuotedString(r)
-			log("finished scanning quoted string, " + string(l.peek()) + " is next.")
-			if err != nil {
-				return err, "", ""
-			}
+		//case '"', '`':
+		//	err := l.scanQuotedString(r)
+		//	log("finished scanning quoted string, " + string(l.peek()) + " is next.")
+		//	if err != nil {
+		//		return err, "", ""
+		//	}
 		case '\\':
 			l.accept("}:")
 		case ':':
@@ -507,11 +531,11 @@ Loop2:
 		switch r := l.next(); r {
 		case eof:
 			return l.errorf("Expected '}' at the end of definition"), "", ""
-		case '"', '`':
-			err := l.scanQuotedString(r)
-			if err != nil {
-				return err, "", ""
-			}
+		//case '"', '`':
+		//	err := l.scanQuotedString(r)
+		//	if err != nil {
+		//		return err, "", ""
+		//	}
 		case '\\':
 			l.accept("},")
 		case '{': // possible js code block
@@ -592,23 +616,17 @@ Loop:
 // We have not consumed any characters
 func lexUDT(l *lexer) stateFn {
 	log("lexUDT")
-	//start := l.pos
 
 	if isNumeric(l.peek()) { // if starts with quantity - scan the number then the unit (it could also be a string that starts with a number)
 		if l.scanNumber(true) {
 			l.emit(itemUDT)
 			return lexBb
 		} else if l.scanNumber(false) { // not a DT so must be a number or a string
-			//l.pos = start
-			//return lexNumber
 			l.emit(itemNumber)
 			return lexBb
 		} else {
 			log("number is actually a string that starts with a number")
-			//l.pos = start
 			return lexString
-			//l.pos = start
-			//return lexIdentifier
 		}
 	} else if l.scanUnit() { // must start with a unit, or could be string or identifier
 
@@ -628,6 +646,7 @@ func lexUDT(l *lexer) stateFn {
 		}
 
 		l.emit(itemUDT)
+
 		return lexBb
 	} else { // not a udt - could be string or identifier
 		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
@@ -741,6 +760,7 @@ Loop:
 
 // scanNumber determines if we have a valid number, or if `udt = true`, a udt that starts with a quantity.
 // Returns false and backtracks if it's not a number, which means it could be a string.
+// TODO: if we only have '-' or '.' then it's not a number, return false, seems to happen for udt quantity
 func (l *lexer) scanNumber(udt bool) bool {
 	startPos := l.pos
 
@@ -857,13 +877,26 @@ Loop: // loop for multiple modifier/value pairs
 // values of modifiers can be numbers, quoted strings, or structures TODO JSON (structure)
 // returns false if invalid
 func (l *lexer) scanValue() bool {
-	log("scanValue")
+	currentUdtUnit := l.udtInstances[len(l.udtInstances)-1]
+	log("scanValue for " + currentUdtUnit)
+
+	currentUdt := l.UDTs[currentUdtUnit]
+	//currentUdt.getModifiers()
+	// TODO: refactor: get the UDT instance that we're lexing and
+	// TODO: colonAllowed should be a property of UDTs as well in case of modifiers
+	// TODO: if UDT has " as a modifier then what looks like a value might not be
 
 	start := l.pos
 
 	quoted := false
 	quoteChar := l.peek()
 	if quoteChar == '"' || quoteChar == '`' {
+		quoted = true
+		l.next()
+
+	} else if l.colonAllowed && quoteChar == ':' {
+		// unquoted value - we look for the next space rather than another ':'
+		quoteChar = ' '
 		quoted = true
 		l.next()
 	}
@@ -882,6 +915,11 @@ Loop:
 				l.backup() // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != eof:
+			// unquoted values - the value can end on ' ' or '\n' (the above case doesn't catch this)
+			if quoteChar == ' ' && r == '\n' {
+				l.backup()
+				break Loop
+			}
 			// absorb
 		case r == '-':
 			if l.pos != start+1 { // absorb but only at the start
@@ -897,10 +935,19 @@ Loop:
 		case unicode.IsNumber(r):
 			// absorb
 		default:
+			// if we reach eof
 			if quoted {
 				if r != quoteChar {
-					log("Unescaped value! Invalid!")
-					return false
+					if currentUdt.QuoteModifiers {
+						// if quoteChar is also a modifier of the UDT, then it's ok!
+						// this means we've absorbed the modifier though, so return to start
+						l.pos = start
+						return true
+					} else {
+						// Otherwise, it's an invalid value
+						log("Unescaped value! Invalid!")
+						return false
+					}
 				}
 				break Loop
 			}
