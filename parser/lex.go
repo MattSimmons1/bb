@@ -17,11 +17,11 @@ type Pos int
 
 // item represents a token or text string returned from the scanner.
 type item struct {
-	typ  itemType // The type of this item.
-	pos  Pos      // The starting position, in bytes, of this item in the input string.
-	val  string   // The value of this item.
-	line int      // The line number at the start of this item.
-	message string  // additional info about the item, e.g. an error message
+	typ     itemType // The type of this item.
+	pos     Pos      // The starting position, in bytes, of this item in the input string.
+	val     string   // The value of this item.
+	line    int      // The line number at the start of this item.
+	message string   // additional info about the item, e.g. an error message
 }
 
 func (i item) String() string {
@@ -42,30 +42,30 @@ func (i item) String() string {
 type itemType int
 
 const (
-	itemError        itemType = iota // error occurred; value is text of error
-	itemBool                         // boolean constant
-	itemNull                         // JSON null
+	itemError itemType = iota // error occurred; value is text of error
+	itemBool                  // boolean constant
+	itemNull                  // JSON null
 	itemEOF
-	itemNumber      // simple number, including imaginary
-	itemPipe        // pipe symbol
-	itemSpace       // run of spaces separating arguments
-	itemString      // quoted string (includes quotes)
-	itemKeyword     // used only to delimit the keywords
-	itemUDT         // user defined type
-	itemTab         // two or more spaces or a tab
-	itemDefinition  // type definition, e.g. ∆ = { unit: pizza }
-	itemNewline     // \n
+	itemNumber     // simple number, including imaginary
+	itemPipe       // pipe symbol
+	itemSpace      // run of spaces separating arguments
+	itemString     // quoted string (includes quotes)
+	itemKeyword    // used only to delimit the keywords
+	itemUDT        // user defined type
+	itemTab        // two or more spaces or a tab
+	itemDefinition // type definition, e.g. ∆ = { unit: pizza }
+	itemNewline    // \n
 	itemAssignment
 	itemPropName
 	itemPropValue
-	itemComment     // inline or multiline comment
+	itemComment // inline or multiline comment
 )
 
 const eof = -1
 
 const (
-	modifiers     = "+~<>:;/|#&≠≥≤^*$£,?!•°·"  // all standard modifiers
-	quotes        = "`\""
+	modifiers = "+~<>:;/|#&≠≥≤^*$£,?!•°·" // all standard modifiers
+	quotes    = "`\""
 )
 
 // stateFn represents the state of the scanner as a function that returns the next state.
@@ -83,6 +83,23 @@ type lexer struct {
 	parenDepth  int       // nesting depth of ( ) exprs
 	line        int       // 1+number of newlines seen
 	startLine   int       // start line of this item
+	// if dashAllowed is true, then '-' can be used to represent negative numbers in values and quantities (default behavior)
+	// if the user defines it as a type then dashAllowed will be set to false and '-' will only be treated as a udt.
+	// if '-' is used as a modifier at the same time as negative values, strange things will happen
+	dashAllowed bool
+	// if dotAllowed is true, then '.' can be used to represent decimal numbers (default behavior)
+	// if the user defines it as a type then dotAllowed will be set to false and '.' will only be treated as a udt.
+	// if '.' is used as a modifier, strange things will happen
+	dotAllowed bool
+	// if colonAllowed is true, then ':' can be used to start an unquoted value (default behavior)
+	// if the user defines it as a type or modifier then colonAllowed will be set to false and
+	// unquoted values will be disabled
+	colonAllowed      bool
+	UDTs              map[string]*udt       // stores user defined types
+	PDTs              map[string]*udt       // stores pre-defined types - these can change if user imports more types
+	udtInstances      []string              // stores the unit of every UDT we find
+	instanceIndex     int                   // only used for parsing - the current index of udtInstances we're parsing
+	modifierInstances []map[string][]string // stores every modifier and raw values we find TODO: this can be moved to the UDTs
 }
 
 var verbose = false
@@ -93,18 +110,22 @@ func SetVerbose() {
 
 func log(message string) {
 	if verbose {
-		if message == "lexBb" {
-			fmt.Print("\n", "\033[92m", message, "\033[0m")
+		if len(message) == 1 {
+			if message == "\n" {
+				message = "\\n"
+			}
+			fmt.Print("/\033[94m", message, "\033[0m")
+		} else if message == "lexBb" {
+			fmt.Print("\n\033[92m", message, "\033[0m")
 		} else {
 			if strings.HasPrefix(message, "lex") {
-			  fmt.Print("/", "\033[92m", message, "\033[0m")
+				fmt.Print("/\033[92m", message, "\033[0m")
 			} else {
-			  fmt.Print("/", message)
+				fmt.Print("/", message)
 			}
 		}
 	}
 }
-
 
 // next returns the next rune in the input.
 func (l *lexer) next() rune {
@@ -118,6 +139,7 @@ func (l *lexer) next() rune {
 	if r == '\n' {
 		l.line++
 	}
+	log(string(r))
 	return r
 }
 
@@ -187,16 +209,26 @@ func (l *lexer) drain() {
 	}
 }
 
-// lex creates a new scanner for the input string.
+// lex creates a new top level scanner for the input string.
 func lex(input string) *lexer {
 
 	l := &lexer{
-		name:        "bb",
-		input:       input + "\n",
-		items:       make(chan item),
-		line:        1,
-		startLine:   1,
+		name:              "bb",
+		input:             input + "\n",
+		items:             make(chan item),
+		line:              1,
+		startLine:         1,
+		instanceIndex:     0,
+		dashAllowed:       true,
+		dotAllowed:        true,
+		colonAllowed:      true,
+		modifierInstances: []map[string][]string{},
+		UDTs:              map[string]*udt{},
+		PDTs:              map[string]*udt{},
 	}
+
+	l.defineBuiltInTypes()
+
 	go l.run()
 	return l
 }
@@ -216,34 +248,6 @@ const (
 	rightComment = "*/"
 )
 
-// lexComment scans a comment. The left comment marker is known to be present.
-func lexComment(l *lexer) stateFn {
-	log("lexComment")
-	l.pos += Pos(len(leftComment))
-	i := strings.Index(l.input[l.pos:], rightComment)
-	if i < 0 {
-		return l.errorf("unclosed comment")
-	}
-	l.pos += Pos(i + len(rightComment))
-	l.emit(itemComment)
-	return lexBb
-}
-
-func lexInlineComment(l *lexer) stateFn {
-	log("lexInlineComment")
-	i := strings.Index(l.input[l.pos:], "\n")  // there will always be one because we add one
-
-	log("comment is: " + l.input[l.pos:l.pos+Pos(i)])
-	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
-	splitComment := strings.SplitN(cleanedComment, " ", 2)
-	if splitComment[0] == "import" && len(splitComment) > 1 {
-		defineImportedTypes(strings.ToLower(splitComment[1]))
-	}
-	l.pos += Pos(i)
-	l.emit(itemComment)
-	return lexBb
-}
-
 // lexBb scans bb
 func lexBb(l *lexer) stateFn {
 	log("lexBb")
@@ -261,7 +265,7 @@ func lexBb(l *lexer) stateFn {
 		return lexQuote
 	case r == '`':
 		return lexRawQuote
-	case couldBeUDT(r) || isNumeric(r):
+	case l.couldBeUDT(r) || isNumeric(r):
 		l.backup()
 		return lexUDT
 	case isNumeric(r):
@@ -272,15 +276,43 @@ func lexBb(l *lexer) stateFn {
 		return lexIdentifier
 	case r == '/':
 		if l.accept("*") {
-		  return lexComment
+			return lexComment
 		} else if l.accept("/") {
 			return lexInlineComment
 		} else {
 			return lexIdentifier
 		}
 	default:
-		return lexIdentifier  // all unicode is allowed, so assume everything else is the start of a definition
+		return lexIdentifier // all unicode is allowed, so assume everything else is the start of a definition
 	}
+	return lexBb
+}
+
+// lexComment scans a comment. The left comment marker is known to be present.
+func lexComment(l *lexer) stateFn {
+	log("lexComment")
+	l.pos += Pos(len(leftComment))
+	i := strings.Index(l.input[l.pos:], rightComment)
+	if i < 0 {
+		return l.errorf("unclosed comment")
+	}
+	l.pos += Pos(i + len(rightComment))
+	l.emit(itemComment)
+	return lexBb
+}
+
+func lexInlineComment(l *lexer) stateFn {
+	log("lexInlineComment")
+	i := strings.Index(l.input[l.pos:], "\n") // there will always be one because we add one
+
+	log("comment is: " + l.input[l.pos:l.pos+Pos(i)])
+	cleanedComment := strings.TrimSpace(strings.Replace(l.input[l.pos:l.pos+Pos(i)], "//", "", 1))
+	splitComment := strings.SplitN(cleanedComment, " ", 2)
+	if splitComment[0] == "import" && len(splitComment) > 1 {
+		l.defineImportedTypes(strings.ToLower(splitComment[1]))
+	}
+	l.pos += Pos(i)
+	l.emit(itemComment)
 	return lexBb
 }
 
@@ -300,11 +332,11 @@ func lexSpace(l *lexer) stateFn {
 			numSpaces++
 		} else if r == '\n' {
 			log("found newline")
-			l.acceptRun(" ")  // ignore whitespace at start of next line
+			l.acceptRun(" ") // ignore whitespace at start of next line
 			l.emit(itemNewline)
 			return lexBb
 		} else {
-		  numSpaces+=2  // tabs count as 2 spaces
+			numSpaces += 2 // tabs count as 2 spaces
 		}
 	}
 
@@ -322,7 +354,7 @@ func lexIdentifier(l *lexer) stateFn {
 Loop:
 	for {
 		switch r := l.next(); {
-		case r != '=' && isUnitChar(r):  // catch assignment with no space before '='
+		case r != '=' && isUnitChar(r): // catch assignment with no space before '='
 			// absorb.
 		default:
 			l.backup()
@@ -337,7 +369,7 @@ Loop:
 				log("word is " + word)
 
 				// look-ahead for assignment
-				l.acceptRun(" ")  // todo: don't consume tabs here if there isn't an assignment
+				l.acceptRun(" ") // todo: don't consume tabs here if there isn't an assignment
 				if l.accept("=") {
 					return lexDefinition
 				}
@@ -350,10 +382,39 @@ Loop:
 	return lexBb
 }
 
-// lex and parse at the same time - '∆ =' has already been consumed
+// scans an alphanumeric that isn't a udt or a number or a definition
+func lexString(l *lexer) stateFn {
+	log("lexString")
+Loop:
+	for {
+		switch l.next() {
+
+		case ' ', '\n':
+			l.backup()
+			word := l.input[l.start:l.pos]
+
+			switch word {
+			case "true", "false":
+				l.emit(itemBool)
+			case "null":
+				l.emit(itemNull)
+			default:
+				log("string is '" + word + "'")
+				l.emit(itemString)
+			}
+			break Loop
+		default:
+			// absorb
+		}
+	}
+
+	return lexBb
+}
+
+// lex and parse at the same time. The assignment (e.g. '∆ =') has already been consumed.
 func lexDefinition(l *lexer) stateFn {
 	log("lexDefinition")
-	unit := strings.TrimSpace(l.input[l.start:l.pos-1])
+	unit := strings.TrimSpace(l.input[l.start : l.pos-1])
 
 	l.acceptRun(" ")
 
@@ -361,7 +422,7 @@ func lexDefinition(l *lexer) stateFn {
 		return l.errorf("Invalid assignment, expected '{")
 	}
 
-	l.emit(itemAssignment)  // ignored by the parser, for syntax highlighting only
+	l.emit(itemAssignment) // ignored by the parser, for syntax highlighting only
 
 	props := make(map[string]string)
 
@@ -373,10 +434,10 @@ Loop:
 		case '}':
 			break Loop
 		case ',':
-			l.emit(itemAssignment)  // just ',', ignored by the parser, for syntax highlighting only
+			l.emit(itemAssignment) // just ',', ignored by the parser, for syntax highlighting only
 		case ' ', '\n':
 			// absorb
-		case '/':  // deal with comments
+		case '/': // deal with comments
 			if l.peek() == '/' {
 				l.backup()
 				lexInlineComment(l)
@@ -391,42 +452,50 @@ Loop:
 				return err
 			}
 			props[propName] = propValue
-
 		}
 	}
 
-	l.emit(itemAssignment)  // just '}', ignored by the parser, for syntax highlighting only
-
+	l.emit(itemAssignment) // just '}', ignored by the parser, for syntax highlighting only
 
 	// special logic: add the definition to the global map of UDTs now - lex it properly later
 	//definitionValue := l.input[l.start:l.pos]
-	NewUDTFromDefinition(unit, props)
+	l.UDTs[unit] = NewUDTFromDefinition(unit, props)
+
+	// if the new unit is a special character then update the rules of the lexer
+	switch unit {
+	case "-":
+		l.dashAllowed = false
+	case ".":
+		l.dotAllowed = false
+	case ":":
+		l.colonAllowed = false
+	}
 
 	//l.emit(itemDefinition)
 
-  return lexBb
+	return lexBb
 }
 
-// Extract the prop name and value. Ignores quotes and spaces.
+// Extract the prop name and value. Double quotes and spaces are ignored.
 func (l *lexer) scanProp() (stateFn, string, string) {
 	log("scanProp")
 
-	start := l.pos - 1
+	start := l.pos
 	propName := ""
 	propValue := ""
-  // TODO: allow commas in quoted value
+	// TODO: allow commas in quoted value
 Loop:
 	// look for an unescaped ':' to end of the prop name
 	for {
 		switch r := l.next(); r {
 		case eof, '}':
 			return l.errorf("Expected ':' at the end of prop name"), "", ""
-		case '"', '`':
-			err := l.scanQuotedString(r)
-			log("finished scanning quoted string, " + string(l.peek()) + " is next.")
-			if err != nil {
-				return err, "", ""
-			}
+		//case '"', '`':
+		//	err := l.scanQuotedString(r)
+		//	log("finished scanning quoted string, " + string(l.peek()) + " is next.")
+		//	if err != nil {
+		//		return err, "", ""
+		//	}
 		case '\\':
 			l.accept("}:")
 		case ':':
@@ -439,10 +508,10 @@ Loop:
 		}
 	}
 
-	l.emit(itemPropName)  // ignored by the parser, for syntax highlighting only
+	l.emit(itemPropName) // ignored by the parser, for syntax highlighting only
 
 	l.accept(":")
-	l.emit(itemAssignment)  // just ':', ignored by the parser, for syntax highlighting only
+	l.emit(itemAssignment) // just ':', ignored by the parser, for syntax highlighting only
 
 	l.acceptRun(" \n")
 
@@ -463,14 +532,14 @@ Loop2:
 		switch r := l.next(); r {
 		case eof:
 			return l.errorf("Expected '}' at the end of definition"), "", ""
-		case '"', '`':
-			err := l.scanQuotedString(r)
-			if err != nil {
-				return err, "", ""
-			}
+		//case '"', '`':
+		//	err := l.scanQuotedString(r)
+		//	if err != nil {
+		//		return err, "", ""
+		//	}
 		case '\\':
 			l.accept("},")
-		case '{':  // possible js code block
+		case '{': // possible js code block
 			err := l.scanJavaScript()
 			if err != nil {
 				return err, "", ""
@@ -484,7 +553,7 @@ Loop2:
 			break Loop2
 		}
 	}
-	l.emit(itemPropValue)  // ignored by the parser, for syntax highlighting only
+	l.emit(itemPropValue) // ignored by the parser, for syntax highlighting only
 
 	return nil, propName, propValue
 }
@@ -500,11 +569,11 @@ Loop:
 		case eof:
 			return l.errorf("Expected '}' at the end of JavaScript")
 		case '{':
-			err := l.scanJavaScript()  // recurse
+			err := l.scanJavaScript() // recurse
 			if err != nil {
 				return err
 			}
-		case '"', '\'', '`':  // don't end for } in string
+		case '"', '\'', '`': // don't end for } in string
 			err := l.scanQuotedString(r)
 			if err != nil {
 				return err
@@ -532,16 +601,15 @@ Loop:
 				log("found escaped quote")
 			} else {
 				log("found stray backslash")
-				l.backup()  // backslash is absorbed
+				l.backup() // backslash is absorbed
 			}
 		case quoteChar:
 			break Loop
 		}
 
 	}
-  return nil
+	return nil
 }
-
 
 // scans something that could be a UDT, an invalid UDT, or a string
 // the unit could be multiple different units that start with the same letter
@@ -549,40 +617,43 @@ Loop:
 // We have not consumed any characters
 func lexUDT(l *lexer) stateFn {
 	log("lexUDT")
-	start := l.pos
 
-	if isNumeric(l.peek()) {  // if starts with quantity - scan the number then the unit
+	if isNumeric(l.peek()) { // if starts with quantity - scan the number then the unit (it could also be a string that starts with a number)
 		if l.scanNumber(true) {
 			l.emit(itemUDT)
 			return lexBb
-		} else {  // not a DT so must be a number - can't be anything else because it starts with a number
-		  l.pos = start
-			return lexNumber
+		} else if l.scanNumber(false) { // not a DT so must be a number or a string
+			l.emit(itemNumber)
+			return lexBb
+		} else {
+			log("number is actually a string that starts with a number")
+			return lexString
 		}
-	} else if l.scanUnit() {  // must start with a unit, or could be string or identifier
+	} else if l.scanUnit() { // must start with a unit, or could be string or identifier
 
 		log("DT with no quantity")
 
-		if !l.scanValue() {  // next thing could be a value or nothing
-		  log("removing unit from instances")
-		  INSTANCES = INSTANCES[:len(INSTANCES)-1]
-			l.emit(itemError)  // modifier has an invalid value
+		if !l.scanValue() { // next thing could be a value or nothing
+			log("removing unit from instances")
+			l.udtInstances = l.udtInstances[:len(l.udtInstances)-1]
+			l.emit(itemError) // modifier has an invalid value
 			return lexBb
 		}
-		if !l.scanModifier() {  // next thing could be a modifier or nothing
+		if !l.scanModifier() { // next thing could be a modifier or nothing
 			log("removing unit from instances")
-			INSTANCES = INSTANCES[:len(INSTANCES)-1]
-			l.emit(itemError)  // modifier has an invalid value
+			l.udtInstances = l.udtInstances[:len(l.udtInstances)-1]
+			l.emit(itemError) // modifier has an invalid value
 			return lexBb
 		}
 
 		l.emit(itemUDT)
+
 		return lexBb
-	} else {  // not a udt - could be string or identifier
+	} else { // not a udt - could be string or identifier
 		log("started like a UDT but wasn't. " + string(l.peek()) + " is next")
 		if isNumeric(l.peek()) {
 			if verbose {
-			 return l.errorf("This shouldn't happen: DT was found to be a number after scanning for numbers")
+				return l.errorf("This shouldn't happen: DT was found to be a number after scanning for numbers")
 			}
 			return lexNumber
 		} else {
@@ -597,9 +668,13 @@ func lexUDT(l *lexer) stateFn {
 // and "089" - but when it's wrong the input is invalid and the parser (via
 // strconv) will notice.
 func lexNumber(l *lexer) stateFn {
+	//start := l.pos
 	log("lexNumber")
 	if !l.scanNumber(false) {
-		return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
+		log("number is actually a string that starts with a number")
+		//l.pos = start
+		return lexString
+		//return l.errorf("bad number syntax: %q", l.input[l.start:l.pos])
 	}
 	l.emit(itemNumber)
 	return lexBb
@@ -607,13 +682,13 @@ func lexNumber(l *lexer) stateFn {
 
 // check if the next few chars could be a UDT unit - backtrack if not
 func (l *lexer) scanUnit() bool {
-  log("scanUnit")
+	log("scanUnit")
 
-  start := l.pos
-  word := ""
+	start := l.pos
+	word := ""
 
-  // find the longest potential unit we can
-  // TODO: get the length of the longest unit (or PDT or key word) and only look up to this length to save time
+	// find the longest potential unit we can
+	// TODO: get the length of the longest unit (or PDT or key word) and only look up to this length to save time
 Loop:
 	for {
 		switch r := l.next(); {
@@ -622,7 +697,7 @@ Loop:
 			log(string(r))
 			// absorb
 		default:
-		  l.backup()
+			l.backup()
 			word = l.input[start:l.pos]
 			if len(word) == 0 {
 				return false
@@ -631,31 +706,31 @@ Loop:
 		}
 	}
 
-  wordEnd := l.pos
-  // now we have the full word we need to make sure it's not a definition or key word
+	wordEnd := l.pos
+	// now we have the full word we need to make sure it's not a definition or key word
 	// look-ahead for assignment
 	l.acceptRun(" ")
 	if l.accept("=") {
 		l.acceptRun(" ")
 		if l.accept("{") {
-	    l.pos = start  // backtrack
-		  return false  // must be a definition
+			l.pos = start // backtrack
+			return false  // must be a definition
 		}
 	}
-  if word == "true" || word == "false" || word == "null" {
-		l.pos = start  // backtrack
+	if word == "true" || word == "false" || word == "null" {
+		l.pos = start // backtrack
 		return false  // it's a key word
 	}
 
-  l.pos = wordEnd  // backtrack in case we looked ahead too much
+	l.pos = wordEnd // backtrack in case we looked ahead too much
 
-  // find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
+	// find the longest unit that matches this word - UDTs take priority over PDTs even if they're shorter
 	// e.g. UDTs are `W`. Input is `Wb`. Assumed to be [`W`, `b`].
 	log("looking for a unit to match '" + word + "'")
 
-  bestUnit := ""
+	bestUnit := ""
 
-	for unit := range UDTs {
+	for unit := range l.UDTs {
 		if strings.HasPrefix(word, unit) && len(unit) > len(bestUnit) {
 			log("it could be UDT '" + unit + "'")
 			bestUnit = unit
@@ -663,7 +738,7 @@ Loop:
 	}
 
 	if bestUnit == "" {
-		for unit := range PDTs {
+		for unit := range l.PDTs {
 			if strings.HasPrefix(word, unit) && len(unit) > len(bestUnit) {
 				log("it could be PDT '" + unit + "'")
 				bestUnit = unit
@@ -671,29 +746,31 @@ Loop:
 		}
 	}
 
-  if bestUnit != "" {
+	if bestUnit != "" {
 		log("unit is " + bestUnit)
 		// now we know what the unit is, store so we know which units we have later - speeds up parsing
-		INSTANCES = append(INSTANCES, bestUnit)
-		l.pos = start + Pos(len(bestUnit))  // backtrack to the end of the unit
+		l.udtInstances = append(l.udtInstances, bestUnit)
+		l.pos = start + Pos(len(bestUnit)) // backtrack to the end of the unit
 		return true
 	} else {
-	  log("it's not a known unit")
-		l.pos = start  // backtrack
+		log("it's not a known unit")
+		l.pos = start // backtrack
 		return false  // unit found did not match any known unit - could be a string
 	}
 }
 
-// determine if we have a valid number or udt
+// scanNumber determines if we have a valid number, or if `udt = true`, a udt that starts with a quantity.
+// Returns false and backtracks if it's not a number, which means it could be a string.
+// TODO: if we only have '-' or '.' then it's not a number, return false, seems to happen for udt quantity
 func (l *lexer) scanNumber(udt bool) bool {
 	startPos := l.pos
 
 	if udt {
-	  log("scanUDT (scanNumber)")
+		log("scanUDT (scanNumber)")
 	} else {
 		log("scanNumber")
 	}
-	l.accept("-")  // Optional leading sign. bb does not allow leading +
+	l.accept("-") // Optional leading sign. bb does not allow leading +
 	l.acceptRun("0123456789")
 	if l.accept(".") {
 		l.acceptRun("0123456789")
@@ -703,26 +780,26 @@ func (l *lexer) scanNumber(udt bool) bool {
 	if udt {
 
 		if !l.scanUnit() {
-			l.pos = startPos  // reset
-			return false  // if there's no unit now then it's not a DT (it's a number)
+			l.pos = startPos // reset
+			return false     // if there's no unit now then it's not a DT (it's a number)
 		}
 
 		if !l.scanValue() {
 			log("removing unit from instances")
-			INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			l.udtInstances = l.udtInstances[:len(l.udtInstances)-1]
 			return false
 		} // if there's no value that's fine
 		if !l.scanModifier() {
 			log("removing unit from instances")
-			INSTANCES = INSTANCES[:len(INSTANCES)-1]
+			l.udtInstances = l.udtInstances[:len(l.udtInstances)-1]
 			return false
-		}  // scans until we get to an unknown modifier (start of something else)
+		} // scans until we get to an unknown modifier (start of something else)
 		return true
 
-	} else {  // for numbers only:
+	} else { // for numbers only:
 		// Next thing mustn't be alphanumeric.
 		if isAlphaNumeric(l.peek()) {
-			l.pos = startPos  // reset
+			l.pos = startPos // reset
 			return false
 		}
 		return true
@@ -734,16 +811,16 @@ func (l *lexer) scanNumber(udt bool) bool {
 func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
-	udt := INSTANCES[len(INSTANCES)-1]
-	var rawModifiers [][2]string
-	MODIFIER_INSTANCES = append(MODIFIER_INSTANCES, &rawModifiers)  // initialise array to store modifiers
+	udt := l.udtInstances[len(l.udtInstances)-1]
+	rawModifiers := map[string][]string{}
+
+	l.modifierInstances = append(l.modifierInstances, rawModifiers) // initialise map to store modifiers
 
 	modifierStart := l.pos
 
-  Loop:  // loop for multiple modifier/value pairs
+Loop: // loop for multiple modifier/value pairs
 	for {
 		r := l.peek()
-		log(string(r))
 
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
@@ -756,15 +833,16 @@ func (l *lexer) scanModifier() bool {
 			m := l.input[modifierStart:l.pos]
 			backtrackCharacters := 0
 
-		  LoopBacktrack: for {  // loop for multiple lengths of modifier, i.e. #>? then #> then #
+		LoopBacktrack:
+			for { // loop for multiple lengths of modifier, i.e. #>? then #> then #
 
 				if len(m) == backtrackCharacters {
 					log("nothing matches " + m)
-					break LoopBacktrack  // if we've already looked for modifiers of length 1 then give up
+					break LoopBacktrack // if we've already looked for modifiers of length 1 then give up
 				} else {
 					m2 := m[:len(m)-backtrackCharacters]
 
-					for modifier := range UDTs[udt].StringProps { // get all the modifiers for the current type
+					for _, modifier := range (l.UDTs[udt]).getModifiers() { // get all the modifiers for the current type
 						if modifier == m2 {
 							l.pos = l.pos - Pos(backtrackCharacters)
 							log("modifier is: \033[92m" + m2 + "\033[0m")
@@ -773,7 +851,12 @@ func (l *lexer) scanModifier() bool {
 								return false
 							} else {
 								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
-								rawModifiers = append(rawModifiers, [2]string{ m2, l.input[modifierStart+Pos(len(m2)):l.pos] })  // store the modifier and value we've found
+
+								if rawModifiers[m2] == nil {
+									// initialise slice of modifier values
+									rawModifiers[m2] = []string{}
+								}
+								rawModifiers[m2] = append(rawModifiers[m2], l.input[modifierStart+Pos(len(m2)):l.pos]) // store the modifier and value we've found
 								// keep going - onto the next modifier
 								modifierStart = l.pos
 								continue Loop
@@ -800,13 +883,26 @@ func (l *lexer) scanModifier() bool {
 // values of modifiers can be numbers, quoted strings, or structures TODO JSON (structure)
 // returns false if invalid
 func (l *lexer) scanValue() bool {
-	log("scanValue")
+	currentUdtUnit := l.udtInstances[len(l.udtInstances)-1]
+	log("scanValue for " + currentUdtUnit)
+
+	currentUdt := l.UDTs[currentUdtUnit]
+	//currentUdt.getModifiers()
+	// TODO: refactor: get the UDT instance that we're lexing and
+	// TODO: colonAllowed should be a property of UDTs as well in case of modifiers
+	// TODO: if UDT has " as a modifier then what looks like a value might not be
 
 	start := l.pos
 
 	quoted := false
 	quoteChar := l.peek()
 	if quoteChar == '"' || quoteChar == '`' {
+		quoted = true
+		l.next()
+
+	} else if l.colonAllowed && quoteChar == ':' {
+		// unquoted value - we look for the next space rather than another ':'
+		quoteChar = ' '
 		quoted = true
 		l.next()
 	}
@@ -822,30 +918,44 @@ Loop:
 				log("found escaped quote")
 			} else {
 				log("found stray backslash")
-				l.backup()  // backslash is absorbed
+				l.backup() // backslash is absorbed
 			}
 		case quoted && r != quoteChar && r != eof:
+			// unquoted values - the value can end on ' ' or '\n' (the above case doesn't catch this)
+			if quoteChar == ' ' && r == '\n' {
+				l.backup()
+				break Loop
+			}
 			// absorb
 		case r == '-':
-			if l.pos != start + 1 {  // absorb but only at the start
-			  l.backup()
-				break Loop  // not a valid number but could be a modifier
+			if l.pos != start+1 { // absorb but only at the start
+				l.backup()
+				break Loop // not a valid number but could be a modifier
 			}
 		case r == '.':
 			if isDecimal {
-        l.backup()
-        break Loop  // not a valid number but could be a modifier
+				l.backup()
+				break Loop // not a valid number but could be a modifier
 			}
-			isDecimal = true  // absorb but only once
+			isDecimal = true // absorb but only once
 		case unicode.IsNumber(r):
 			// absorb
 		default:
+			// if we reach eof
 			if quoted {
-        if r != quoteChar {
-					log("Unescaped value! Invalid!")
-					return false
+				if r != quoteChar {
+					if currentUdt.QuoteModifiers {
+						// if quoteChar is also a modifier of the UDT, then it's ok!
+						// this means we've absorbed the modifier though, so return to start
+						l.pos = start
+						return true
+					} else {
+						// Otherwise, it's an invalid value
+						log("Unescaped value! Invalid!")
+						return false
+					}
 				}
-        break Loop
+				break Loop
 			}
 			l.backup()
 			break Loop
@@ -853,11 +963,11 @@ Loop:
 	}
 
 	if l.input[start:l.pos] == "-" || l.input[start:l.pos] == "." {
-		l.backup()  // check value is not invalid number - if so, remove it
+		l.backup() // check value is not invalid number - if so, remove it
 	}
 
-	if l.pos > start && l.input[l.pos-1:l.pos] == "." {  // don't allow numbers like '2.' as these could break modifiers starting with '.'
-		l.backup()  // remove decimal point
+	if l.pos > start && l.input[l.pos-1:l.pos] == "." { // don't allow numbers like '2.' as these could break modifiers starting with '.'
+		l.backup() // remove decimal point
 	}
 
 	return true
@@ -903,6 +1013,7 @@ Loop:
 }
 
 // only used for seeing if a prop should be included in the output - standard modifier chars are not
+// TODO: not working for '•'
 func isModifierChar(r rune) bool {
 	return strings.ContainsRune(modifiers, r)
 }
@@ -933,10 +1044,10 @@ func isAlphaNumeric(r rune) bool {
 
 func Preview(input string) {
 	l := lex(input)
-	idx := 0  // keep track of which udt we're looking at
+	idx := 0 // keep track of which udt we're looking at
 	for item := range l.items {
 
-		colour := ""  // https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
+		colour := "" // https://en.wikipedia.org/wiki/ANSI_escape_code#3-bit_and_4-bit
 		if item.typ == itemUDT {
 			colour = "37"
 
@@ -962,19 +1073,33 @@ func Preview(input string) {
 
 		if item.typ == itemUDT {
 
-			unit := INSTANCES[idx]
+			unit := l.udtInstances[idx]
 			idx += 1
-			halves := strings.SplitN(item.val, unit, 2)  // split into quantity and everything else
+			halves := strings.SplitN(item.val, unit, 2) // split into quantity and everything else
 
 			fmt.Print("\033[", colour, "m", halves[0], "\033[1m", "\033[94m", unit, "\033[0m", "\033[", colour, "m", halves[1], "\033[0m")
 
 		} else {
-		  fmt.Print("\033[", colour, "m", item.val, "\033[0m")
+			fmt.Print("\033[", colour, "m", item.val, "\033[0m")
 		}
 	}
 }
 
-// return all items from the input and what colour they should be as a JSON object
+func (l *lexer) ParseUDT(input string) interface{} {
+	unit := l.udtInstances[l.instanceIndex]
+
+	defer func() {
+		l.instanceIndex++
+	}()
+
+	t := l.UDTs[unit]
+	if t == nil {
+		t = l.PDTs[unit]
+	}
+	return ParseUDT(input, t, l.modifierInstances[l.instanceIndex])
+}
+
+// Syntax returns all items from the input and what colour they should be as a JSON object
 func Syntax(input string) map[string]interface{} {
 	l := lex(input)
 
@@ -984,55 +1109,55 @@ func Syntax(input string) map[string]interface{} {
 	for item := range l.items {
 
 		switch item.typ {
-		  case itemUDT:
+		case itemUDT:
 
-				unit := INSTANCES[instanceIdx]
-				//udt := UDTs[unit]
-				data := ParseUDT(item.val)
-				udt := make([]interface{}, 0)
-				log(item.val)
+			unit := l.udtInstances[l.instanceIndex]
+			data := l.ParseUDT(item.val)
 
-				halves := strings.SplitN(item.val, unit, 2)  // split into quantity and everything else
-				quantity := halves[0]
-				udt = append(udt, map[string]interface{}{ "class": "quantity", "value": quantity })
-				udt = append(udt, map[string]interface{}{ "class": "unit", "value": unit })
-				// TODO: split everything else into modifiers and values
-				if len(halves) > 1 {
-				  udt = append(udt, map[string]interface{}{ "class": "value", "value": halves[1] })
-				}
-				// TODO: modifiers
-				//for modifierUnit, modifierValue := range(modifiers) {
-			  //  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierUnit", "value": modifierValue })
-			  //  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierValue", "value": modifierValue })
-		  	//}
+			udt := make([]interface{}, 0)
+			log(item.val)
 
-		  	output = append(output, map[string]interface{}{ "class": "UDT UDT-" + unit, "value": udt, "data": data })
+			halves := strings.SplitN(item.val, unit, 2) // split into quantity and everything else
+			quantity := halves[0]
+			udt = append(udt, map[string]interface{}{"class": "quantity", "value": quantity})
+			udt = append(udt, map[string]interface{}{"class": "unit", "value": unit})
+			// TODO: split everything else into modifiers and values
+			if len(halves) > 1 {
+				udt = append(udt, map[string]interface{}{"class": "value", "value": halves[1]})
+			}
+			// TODO: modifiers
+			//for modifierUnit, modifierValue := range(modifiers) {
+			//  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierUnit", "value": modifierValue })
+			//  output = append(output, map[string]interface{}{ "class": "modifier modifier-" + modifierUnit + " modifierValue", "value": modifierValue })
+			//}
 
-		  case itemString:
-				output = append(output, map[string]interface{}{ "class": "string", "value": item.val })
-			case itemNumber:
-			  output = append(output, map[string]interface{}{ "class": "number", "value": item.val })
-		  case itemAssignment:
-			  output = append(output, map[string]interface{}{ "class": "assignment", "value": item.val })
-		  case itemPropName:
-			  output = append(output, map[string]interface{}{ "class": "propName", "value": item.val })
-		  case itemPropValue:
-			  output = append(output, map[string]interface{}{ "class": "propValue", "value": item.val })
-		  case itemBool:
-			  output = append(output, map[string]interface{}{ "class": "bool", "value": item.val })
-		  case itemNull:
-			  output = append(output, map[string]interface{}{ "class": "null", "value": item.val })
-		  case itemError:
-			  output = append(output, map[string]interface{}{ "class": "error", "value": item.val, "error": item.message })
-		  case itemComment:
-			  output = append(output, map[string]interface{}{ "class": "comment", "value": item.val })
-		  case itemEOF:
-			  // do nothing
-			default:
-        output = append(output, item.val)
+			output = append(output, map[string]interface{}{"class": "UDT UDT-" + unit, "value": udt, "data": data})
+
+		case itemString:
+			output = append(output, map[string]interface{}{"class": "string", "value": item.val})
+		case itemNumber:
+			output = append(output, map[string]interface{}{"class": "number", "value": item.val})
+		case itemAssignment:
+			output = append(output, map[string]interface{}{"class": "assignment", "value": item.val})
+		case itemPropName:
+			output = append(output, map[string]interface{}{"class": "propName", "value": item.val})
+		case itemPropValue:
+			output = append(output, map[string]interface{}{"class": "propValue", "value": item.val})
+		case itemBool:
+			output = append(output, map[string]interface{}{"class": "bool", "value": item.val})
+		case itemNull:
+			output = append(output, map[string]interface{}{"class": "null", "value": item.val})
+		case itemError:
+			output = append(output, map[string]interface{}{"class": "error", "value": item.val, "error": item.message})
+		case itemComment:
+			output = append(output, map[string]interface{}{"class": "comment", "value": item.val})
+		case itemEOF:
+			// do nothing
+		default:
+			output = append(output, item.val)
 		}
 
 	}
 
-	return map[string]interface{}{ "classes": classes, "items": output }
+	return map[string]interface{}{"classes": classes, "items": output}
 }
