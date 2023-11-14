@@ -27,7 +27,7 @@ Try it out in your browser with the [**bb playground**](https://mattsimmons1.git
 If you have [go](https://golang.org/doc/install) installed you can build the binary yourself and install with:
 
 ```bash
-go get github.com/MattSimmons1/bb
+go install github.com/MattSimmons1/bb@latest
 ```
 
 Alternatively, download the binary from the [releases page](https://github.com/MattSimmons1/bb/releases) and save to a location on your PATH.
