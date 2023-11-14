@@ -95,11 +95,11 @@ type lexer struct {
 	// if the user defines it as a type or modifier then colonAllowed will be set to false and
 	// unquoted values will be disabled
 	colonAllowed      bool
-	UDTs              map[string]*udt      // stores user defined types
-	PDTs              map[string]*udt      // stores pre-defined types - these can change if user imports more types
-	udtInstances      []string             // stores the unit of every UDT we find
-	instanceIndex     int                  // only used for parsing - the current index of udtInstances we're parsing
-	modifierInstances []*map[string]string // stores every modifier and raw value we find TODO: this can be moved to the UDTs
+	UDTs              map[string]*udt       // stores user defined types
+	PDTs              map[string]*udt       // stores pre-defined types - these can change if user imports more types
+	udtInstances      []string              // stores the unit of every UDT we find
+	instanceIndex     int                   // only used for parsing - the current index of udtInstances we're parsing
+	modifierInstances []map[string][]string // stores every modifier and raw values we find TODO: this can be moved to the UDTs
 }
 
 var verbose = false
@@ -213,17 +213,18 @@ func (l *lexer) drain() {
 func lex(input string) *lexer {
 
 	l := &lexer{
-		name:          "bb",
-		input:         input + "\n",
-		items:         make(chan item),
-		line:          1,
-		startLine:     1,
-		instanceIndex: 0,
-		dashAllowed:   true,
-		dotAllowed:    true,
-		colonAllowed:  true,
-		UDTs:          map[string]*udt{},
-		PDTs:          map[string]*udt{},
+		name:              "bb",
+		input:             input + "\n",
+		items:             make(chan item),
+		line:              1,
+		startLine:         1,
+		instanceIndex:     0,
+		dashAllowed:       true,
+		dotAllowed:        true,
+		colonAllowed:      true,
+		modifierInstances: []map[string][]string{},
+		UDTs:              map[string]*udt{},
+		PDTs:              map[string]*udt{},
 	}
 
 	l.defineBuiltInTypes()
@@ -811,15 +812,15 @@ func (l *lexer) scanModifier() bool {
 	log("scanModifier")
 
 	udt := l.udtInstances[len(l.udtInstances)-1]
-	rawModifiers := map[string]string{}
-	l.modifierInstances = append(l.modifierInstances, &rawModifiers) // initialise map to store modifiers
+	rawModifiers := map[string][]string{}
+
+	l.modifierInstances = append(l.modifierInstances, rawModifiers) // initialise map to store modifiers
 
 	modifierStart := l.pos
 
 Loop: // loop for multiple modifier/value pairs
 	for {
 		r := l.peek()
-		log(string(r))
 
 		// read until we hit a non modifier (number, dot followed by number, dash followed by number)
 		// then check it's a known modifier - if not then stop
@@ -841,7 +842,7 @@ Loop: // loop for multiple modifier/value pairs
 				} else {
 					m2 := m[:len(m)-backtrackCharacters]
 
-					for modifier := range l.UDTs[udt].StringProps { // get all the modifiers for the current type
+					for _, modifier := range (l.UDTs[udt]).getModifiers() { // get all the modifiers for the current type
 						if modifier == m2 {
 							l.pos = l.pos - Pos(backtrackCharacters)
 							log("modifier is: \033[92m" + m2 + "\033[0m")
@@ -850,7 +851,11 @@ Loop: // loop for multiple modifier/value pairs
 								return false
 							} else {
 								log("value is \033[92m" + l.input[modifierStart+Pos(len(m2)):l.pos] + "\033[0m")
-								rawModifiers[m2] = l.input[modifierStart+Pos(len(m2)) : l.pos] // store the modifier and value we've found
+								if rawModifiers[m2] == nil {
+									// initialise slice of modifier values
+									rawModifiers[m2] = []string{}
+								}
+								rawModifiers[m2] = append(rawModifiers[m2], l.input[modifierStart+Pos(len(m2)):l.pos]) // store the modifier and value we've found
 								// keep going - onto the next modifier
 								modifierStart = l.pos
 								continue Loop
@@ -1082,16 +1087,15 @@ func Preview(input string) {
 func (l *lexer) ParseUDT(input string) interface{} {
 	unit := l.udtInstances[l.instanceIndex]
 
-	f := func() {
+	defer func() {
 		l.instanceIndex++
-	}
-	defer f()
+	}()
 
 	t := l.UDTs[unit]
 	if t == nil {
 		t = l.PDTs[unit]
 	}
-	return ParseUDT(input, t, *l.modifierInstances[l.instanceIndex])
+	return ParseUDT(input, t, l.modifierInstances[l.instanceIndex])
 }
 
 // Syntax returns all items from the input and what colour they should be as a JSON object

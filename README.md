@@ -5,9 +5,9 @@ Pictographic programming language. Designed to make metadata injection and data 
 
 Define your own types and the syntax for them! Then bb converts them to JSON. For example:
 
-    a = { type: apple, ': isRed }  // this is a type definion
+    a = { type: apple, >: isRed }  // this is a type definion
     
-    a 4a a' a`foo`  // this is data
+    a 4a a> a:foo  // this is data
 
 Is converted to:
 
@@ -61,49 +61,52 @@ $ bb my_data.bb.txt
 
 ### Basic Syntax
 
-| Syntax      | Usage | Result    |
-|-------------|-------|-----------|
-| number       | 12    | `12`        | 
-| string       | foo    | `"foo"`        | 
-| safe string  | "foo" or \`foo`   | `"foo"`      | 
-| array        | 1 2 "foo"    | `[1, 2, "foo"]` |
-| user defined type | ∆ = { }<br>∆ | `{}` | 
-| quantity      | ∆ = { }<br>3∆    | `{ "quantity": 3 }` |
-| numeric value | ∆ = { }<br>∆5    | `{ "value": 5 }` |
-| string value  | ∆ = { }<br>∆\`foo`    | `{ "value": "foo" }` |
-| numeric prop  | ∆ = { foo: 100 }<br>∆    | `{ "foo": 100 }`  |
-| string prop   | ∆ = { foo: bar }<br>∆    | `{ "foo": "bar" }` |
-| modifier          | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
+| Syntax            | Usage                        | Result                  |
+|-------------------|------------------------------|-------------------------|
+| number            | 12                           | `12`                    | 
+| string            | foo                          | `"foo"`                 | 
+| safe string       | "foo" or \`foo`              | `"foo"`                 | 
+| array             | 1 2 "foo"                    | `[1, 2, "foo"]`         |
+| user defined type | ∆ = { }<br>∆                 | `{}`                    | 
+| quantity          | ∆ = { }<br>3∆                | `{ "quantity": 3 }`     |
+| numeric value     | ∆ = { }<br>∆5                | `{ "value": 5 }`        |
+| string value      | ∆ = { }<br>∆"foo"            | `{ "value": "foo" }`    |
+| string value      | ∆ = { }<br>∆\`foo`           | `{ "value": "foo" }`    |
+| string value      | ∆ = { }<br>∆:foo             | `{ "value": "foo" }`    |
+| numeric prop      | ∆ = { foo: 100 }<br>∆        | `{ "foo": 100 }`        |
+| string prop       | ∆ = { foo: bar }<br>∆        | `{ "foo": "bar" }`      |
+| modifier          | ∆ = { +: foo }<br>∆+         | `{ "foo": true }`       |
+| modifier value    | ∆ = { +: foo }<br>∆+1        | `{ "foo": 1 }`          |
 | repeated modifier | ∆ = { +: foo }<br>∆+3+\`bar` | `{ "foo": [3, "bar"] }` |
 | script prop       | ∆ = { foo: d => 2 * 2 }<br>∆ | `{ "foo": 4 }`          |
 
-### Reserved Characters, Key Words, and Other Syntax
+### Reserved Characters, Keywords, and Other Syntax
 
 These can't be used as units or modifiers
 
-| Syntax     | Meaning    |
-|------------|------------|
-| =          | Defines a type |
-| .          | Decimal point  |
-| -          | Negative sign  |
-| { }        | Start and end of a code block or structure |
-| true       | JSON true  |
-| false      | JSON false |
-| null       | JSON null  |
-| // foo  | inline comment |
-| /* foo<br>bar \*/ | multiline comment | 
-| // import currency | import statement - see [imported types](#imported-types)  |  
+| Syntax             | Meaning                                                  |
+|--------------------|----------------------------------------------------------|
+| =                  | Defines a type                                           |
+| .                  | Decimal point                                            |
+| -                  | Negative sign                                            |
+| { }                | Start and end of a code block or structure               |
+| true               | JSON true                                                |
+| false              | JSON false                                               |
+| null               | JSON null                                                |
+| // foo             | inline comment                                           |
+| /* foo<br>bar \*/  | multiline comment                                        | 
+| // import currency | import statement - see [imported types](#imported-types) |  
 
 
 ### Pre-Defined Types
 
 The following types are pre-defined. some behave differently: 
 
-| Unit  | Example | Behaviour  |
-|-------|---------|------------|
+| Unit  | Example                         | Behaviour                    |
+|-------|---------------------------------|------------------------------|
 | md    | ```md`hello` ```                | normal - represents markdown |
-| json  | ```json`{"foo": [1, 2, 3]}` ``` | value is converted to JSON |
-| yaml  | ```yaml`foo: bar` ```           | value is converted to YAML |
+| json  | ```json`{"foo": [1, 2, 3]}` ``` | value is converted to JSON   |
+| yaml  | ```yaml`foo: bar` ```           | value is converted to YAML   |
 
 
 ### Imported Types
@@ -166,13 +169,13 @@ This would return:
 The bb: 
 ```
 r = { type: survey response }
-4r"no" 10r"yes"
+4r:no 10r:yes
 ```
 becomes:
  
 ```json
 [{"type":"survey response", "quantity": 4, "value": "no"}, {"type":"survey response", "quantity": 10, "value": "yes"}]
 ```
- 
-Explanation: The value on the left side of the unit is called the **_quantity_** and the value on the right side is the **_value_**. Values can be numbers or quoted strings. Quantities can only be numbers. 
+
+Explanation: The value on the left side of the unit is called the **_quantity_** and the value on the right side is the **_value_**. Values can be numbers or quoted strings, or `:` followed by an unquoted string. Quantities can only be numbers. 
 

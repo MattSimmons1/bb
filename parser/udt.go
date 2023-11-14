@@ -1,4 +1,3 @@
-// Type to represent the definition of a UDT. Built-in types are defined here.
 package parser
 
 import (
@@ -9,15 +8,17 @@ import (
 	"unicode"
 )
 
+// Type to represent the definition of a UDT. Built-in types are defined here.
 type udt struct {
 	isSpecial      bool // has special properties that affect parsing (for pre-defined types)
 	colonAllowed   bool // see lexer.colonAllowed
 	Unit           string
 	NumericalProps map[string]float64
-	StringProps    map[string]string
-	ScriptProps    map[string]string
-	HiddenProps    []string
-	QuoteModifiers bool // if true, then this UDT is using " as a modifier, which affects parsing
+	StringProps    map[string]string // props with string values - these are all automatically treated as modifiers
+	ScriptProps    map[string]string // props that have JavaScript functions as values
+	HiddenProps    []string          // props that are used as modifiers will be hidden from the final value
+	QuoteModifiers bool              // if true, then this UDT is using " as a modifier, which affects parsing
+
 }
 
 func NewUDT(unit string, numericalProps map[string]float64, stringProps map[string]string,
@@ -73,8 +74,8 @@ func NewUDTFromDefinition(unit string, props map[string]string) *udt {
 	return NewUDT(unit, numericalProps, stringProps, scriptProps, quoteModifiers)
 }
 
-// parse a UDT string - we already know it's valid
-func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{} {
+// Parse a UDT string - we already know it's valid
+func (t *udt) Parse(s string, modifiers map[string][]string) map[string]interface{} {
 	log("parse " + s + " with unit " + t.Unit)
 
 	pos := strings.Index(s, t.Unit)
@@ -188,14 +189,15 @@ func (t *udt) Parse(s string, modifiers map[string]string) map[string]interface{
 		}
 	}
 
-	for modifier, rawValue := range modifiers {
-		t.addModifierToData(data, modifier, rawValue)
+	for modifier, rawValues := range modifiers {
+		t.addModifierToData(data, modifier, rawValues)
 	}
 
 	for k, v := range t.NumericalProps {
 		data[k] = v
 	}
 
+	// hide certain props
 LoopStringProps:
 	for k, v := range t.StringProps {
 		for _, prop := range t.HiddenProps {
@@ -210,58 +212,82 @@ LoopStringProps:
 	}
 
 	for k, v := range t.ScriptProps {
-		data[k] = RunScript(v, data)
+		result := RunScript(v, data)
+		data[k] = result
 	}
 
 	return data
 }
 
-func (t *udt) addModifierToData(data map[string]interface{}, modifier string, value string) {
-	t.HiddenProps = append(t.HiddenProps, modifier)
+func (t *udt) addModifierToData(data map[string]interface{}, modifier string, values []string) {
+	log("modifier: " + modifier)
+
 	modifierName := t.StringProps[modifier]
+	// if modifier is a scriptProp then use itself as the name
+	if modifierName == "" {
+		modifierName = modifier
+	}
+	t.HiddenProps = append(t.HiddenProps, modifier)
+
+	log("addModifierToData: " + modifierName + " = [" + strings.Join(values, ", ") + "]")
 	appendValue := false
 	valueIsBool := false
 
-	if value == "" {
-		valueIsBool = true
-	}
+	for _, value := range values {
 
-	// remove quotes
-	value = removeQuotes(value)
+		if value == "" {
+			valueIsBool = true
+		}
 
-	if data[modifierName] != nil { // determine if there is already a value for this modifier - if so then append
-		if data[modifierName] == "" { // TODO: why does this happen?
-			// don't append
+		// remove quotes
+		value = removeQuotes(value)
+
+		if data[modifierName] != nil { // determine if there is already a value for this modifier - if so then append
+			if data[modifierName] == "" { // TODO: why does this happen?
+				// don't append
+				log("Found empty value for modifier '" + modifierName + "'. This shouldn't happen")
+			} else {
+				appendValue = true
+				if _, ok := data[modifierName].([]interface{}); !ok { // if the value is not already a slice
+					data[modifierName] = []interface{}{data[modifierName]} // convert to slice
+				}
+			}
+		}
+		if valueIsBool {
+			if appendValue {
+				data[modifierName] = append(data[modifierName].([]interface{}), true)
+			} else {
+				data[modifierName] = true
+			}
+		} else if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
+			if appendValue {
+				data[modifierName] = append(data[modifierName].([]interface{}), number)
+			} else {
+				data[modifierName] = number
+			}
 		} else {
-			appendValue = true
-			if _, ok := data[modifierName].([]interface{}); !ok { // if the value is not already a slice
-				data[modifierName] = []interface{}{data[modifierName]} // convert to slice
+			if appendValue {
+				data[modifierName] = append(data[modifierName].([]interface{}), value)
+			} else {
+				data[modifierName] = value
 			}
 		}
 	}
-	if valueIsBool {
-		if appendValue {
-			data[modifierName] = append(data[modifierName].([]interface{}), true)
-		} else {
-			data[modifierName] = true
-		}
-	} else if number, err := strconv.ParseFloat(value, 64); err == nil { // if value is valid number
-		if appendValue {
-			data[modifierName] = append(data[modifierName].([]interface{}), number)
-		} else {
-			data[modifierName] = number
-		}
-	} else {
-		if appendValue {
-			data[modifierName] = append(data[modifierName].([]interface{}), value)
-		} else {
-			data[modifierName] = value
-		}
+
+}
+
+func (t *udt) getModifiers() (all []string) {
+	for modifier := range t.StringProps {
+		all = append(all, modifier)
 	}
+	for modifier := range t.ScriptProps {
+		all = append(all, modifier)
+	}
+	return all
 }
 
 // ParseUDT converts a string to a given UDT and then converts to JSON
-func ParseUDT(input string, t *udt, modifiers map[string]string) interface{} {
+func ParseUDT(input string, t *udt, modifiers map[string][]string) interface{} {
 
 	unit := t.Unit
 
